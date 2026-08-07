@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control de Barrera — micro:bit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14171a;
+    --surface:#1c2024;
+    --surface-2:#242a2f;
+    --hazard-yellow:#ffc933;
+    --accent-red:#e85c4a;
+    --accent-green:#4cc38a;
+    --text:#edeef0;
+    --muted:#868e96;
+    --border:#2e353b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Mono', monospace;
+    min-height:100vh;
+    padding-bottom:40px;
+  }
+  .hazard-bar{
+    height:10px;
+    width:100%;
+    background:repeating-linear-gradient(
+      135deg,
+      var(--hazard-yellow) 0px, var(--hazard-yellow) 18px,
+      #14171a 18px, #14171a 36px
+    );
+  }
+  header{
+    padding:28px 20px 18px;
+    text-align:center;
+  }
+  h1{
+    font-family:'Barlow Condensed', sans-serif;
+    font-weight:800;
+    font-size:clamp(28px, 6vw, 42px);
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+    margin:0;
+  }
+  .eyebrow{
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  main{
+    max-width:520px;
+    margin:0 auto;
+    padding:0 16px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .panel{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px;
+  }
+  .panel-title{
+    font-family:'Barlow Condensed', sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    font-size:14px;
+    color:var(--muted);
+    margin:0 0 12px;
+  }
+  video{
+    width:100%;
+    border-radius:8px;
+    background:#000;
+    display:block;
+    aspect-ratio:4/3;
+    object-fit:cover;
+  }
+  .status-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--border);
+    font-size:14px;
+  }
+  .status-row:last-child{border-bottom:none;}
+  .pill{
+    font-family:'Barlow Condensed', sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    font-size:13px;
+    padding:4px 12px;
+    border-radius:100px;
+  }
+  .pill.off{background:var(--surface-2); color:var(--muted);}
+  .pill.connected{background:rgba(76,195,138,0.15); color:var(--accent-green);}
+  .pill.open{background:rgba(76,195,138,0.15); color:var(--accent-green);}
+  .pill.closed{background:rgba(232,92,74,0.15); color:var(--accent-red);}
+  .meter{
+    height:8px;
+    width:120px;
+    background:var(--surface-2);
+    border-radius:100px;
+    overflow:hidden;
+  }
+  .meter-fill{
+    height:100%;
+    width:0%;
+    background:var(--hazard-yellow);
+    transition:width 0.1s linear;
+  }
+  button{
+    font-family:'Barlow Condensed', sans-serif;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    font-size:15px;
+    border:none;
+    border-radius:8px;
+    padding:13px 16px;
+    cursor:pointer;
+    transition:filter 0.15s;
+  }
+  button:hover{filter:brightness(1.1);}
+  button:active{filter:brightness(0.9);}
+  button:disabled{opacity:0.4; cursor:not-allowed;}
+  .btn-primary{background:var(--hazard-yellow); color:#14171a; width:100%;}
+  .btn-row{display:flex; gap:10px;}
+  .btn-open{background:rgba(76,195,138,0.15); color:var(--accent-green); flex:1;}
+  .btn-close{background:rgba(232,92,74,0.15); color:var(--accent-red); flex:1;}
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:14px;
+  }
+  .switch{
+    position:relative; width:44px; height:24px;
+    background:var(--surface-2); border-radius:100px;
+    cursor:pointer; border:1px solid var(--border);
+  }
+  .switch.on{background:rgba(76,195,138,0.3);}
+  .switch::after{
+    content:''; position:absolute; top:2px; left:2px;
+    width:18px; height:18px; border-radius:50%;
+    background:var(--muted); transition:0.2s;
+  }
+  .switch.on::after{background:var(--accent-green); left:22px;}
+  input[type=range]{
+    width:100%; accent-color:var(--hazard-yellow);
+  }
+  .log{
+    font-size:12px;
+    color:var(--muted);
+    max-height:130px;
+    overflow-y:auto;
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+  }
+  .log div span{color:var(--text);}
+  .hint{
+    font-size:12px;
+    color:var(--muted);
+    line-height:1.5;
+    margin-top:10px;
+  }
+  #notSupported{
+    display:none;
+    background:rgba(232,92,74,0.12);
+    border:1px solid var(--accent-red);
+    color:var(--accent-red);
+    padding:12px 14px;
+    border-radius:8px;
+    font-size:13px;
+    margin-bottom:14px;
+  }
+</style>
+</head>
+<body>
+<div class="hazard-bar"></div>
+<header>
+  <div class="eyebrow">Proyecto micro:bit</div>
+  <h1>Control de Barrera</h1>
+</header>
+
+<main>
+  <div id="notSupported">
+    ⚠ Este navegador no soporta Web Bluetooth. Abrí esta página en <span style="color:var(--text)">Chrome o Edge</span> (Android o computadora).
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Conexión</p>
+    <div class="status-row">
+      <span>micro:bit</span>
+      <span class="pill off" id="bleStatus">Desconectado</span>
+    </div>
+    <button class="btn-primary" id="connectBtn" style="margin-top:10px;">Conectar micro:bit</button>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Cámara — Detección de movimiento</p>
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="status-row" style="margin-top:10px;">
+      <span>Movimiento</span>
+      <div class="meter"><div class="meter-fill" id="motionMeter"></div></div>
+    </div>
+    <div class="status-row">
+      <span>Sensibilidad</span>
+      <input type="range" id="sensitivity" min="1" max="30" value="10" style="width:140px;">
+    </div>
+    <div class="toggle-row" style="padding-top:10px;">
+      <span>Detección automática</span>
+      <div class="switch on" id="autoToggle"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Estado de la barrera</p>
+    <div class="status-row">
+      <span>Posición</span>
+      <span class="pill closed" id="barrierStatus">Cerrada</span>
+    </div>
+    <div class="btn-row" style="margin-top:10px;">
+      <button class="btn-open" id="openBtn">Abrir</button>
+      <button class="btn-close" id="closeBtn">Cerrar</button>
+    </div>
+    <p class="hint">Los botones manuales funcionan siempre. La detección automática abre la barrera al ver movimiento y la cierra a los pocos segundos de quietud.</p>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Registro</p>
+    <div class="log" id="log"></div>
+  </div>
+</main>
+
+<script>
+const UART_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const UART_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // escribimos aquí (RX del microbit)
+const UART_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notificaciones del microbit
+
+let rxCharacteristic = null;
+let bleDevice = null;
+let barrierOpen = false;
+let autoEnabled = true;
+let noMotionTimer = null;
+let lastFrame = null;
+
+const $ = (id) => document.getElementById(id);
+const logEl = $('log');
+const bleStatus = $('bleStatus');
+const barrierStatus = $('barrierStatus');
+const motionMeter = $('motionMeter');
+const autoToggle = $('autoToggle');
+const video = $('video');
+const canvas = $('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+function log(msg){
+  const line = document.createElement('div');
+  const time = new Date().toLocaleTimeString();
+  line.innerHTML = `<span>[${time}]</span> ${msg}`;
+  logEl.prepend(line);
+}
+
+if (!navigator.bluetooth) {
+  $('notSupported').style.display = 'block';
+  $('connectBtn').disabled = true;
+}
+
+// --- Conexión Bluetooth ---
+$('connectBtn').addEventListener('click', async () => {
+  try {
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'BBC micro:bit' }],
+      optionalServices: [UART_SERVICE]
+    });
+    log('Emparejando con ' + bleDevice.name + '...');
+    const server = await bleDevice.gatt.connect();
+    const service = await server.getPrimaryService(UART_SERVICE);
+    rxCharacteristic = await service.getCharacteristic(UART_RX);
+
+    bleStatus.textContent = 'Conectado';
+    bleStatus.className = 'pill connected';
+    $('connectBtn').textContent = 'Conectado ✓';
+    $('connectBtn').disabled = true;
+    log('Conexión Bluetooth establecida.');
+
+    bleDevice.addEventListener('gattserverdisconnected', () => {
+      bleStatus.textContent = 'Desconectado';
+      bleStatus.className = 'pill off';
+      $('connectBtn').textContent = 'Conectar micro:bit';
+      $('connectBtn').disabled = false;
+      log('Se perdió la conexión con la micro:bit.');
+    });
+  } catch (err) {
+    log('Error al conectar: ' + err.message);
+  }
+});
+
+async function sendCommand(cmd){
+  if (!rxCharacteristic) { log('No hay conexión Bluetooth activa.'); return; }
+  const encoder = new TextEncoder();
+  try {
+    await rxCharacteristic.writeValue(encoder.encode(cmd + '\n'));
+    log('Enviado: ' + cmd);
+  } catch (err) {
+    log('Error al enviar: ' + err.message);
+  }
+}
+
+function setBarrier(open){
+  barrierOpen = open;
+  barrierStatus.textContent = open ? 'Abierta' : 'Cerrada';
+  barrierStatus.className = 'pill ' + (open ? 'open' : 'closed');
+  sendCommand(open ? 'OPEN' : 'CLOSE');
+}
+
+$('openBtn').addEventListener('click', () => setBarrier(true));
+$('closeBtn').addEventListener('click', () => setBarrier(false));
+
+autoToggle.addEventListener('click', () => {
+  autoEnabled = !autoEnabled;
+  autoToggle.classList.toggle('on', autoEnabled);
+  log('Detección automática ' + (autoEnabled ? 'activada' : 'desactivada') + '.');
+});
+
+// --- Cámara y detección de movimiento ---
+async function startCamera(){
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }, audio: false
+    });
+    video.srcObject = stream;
+    video.addEventListener('loadedmetadata', () => {
+      canvas.width = 80;
+      canvas.height = 60;
+      requestAnimationFrame(detectLoop);
+    });
+    log('Cámara iniciada.');
+  } catch (err) {
+    log('No se pudo acceder a la cámara: ' + err.message);
+  }
+}
+
+function detectLoop(){
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+  if (lastFrame){
+    let diffSum = 0;
+    for (let i = 0; i < frame.data.length; i += 4){
+      const gray1 = (frame.data[i] + frame.data[i+1] + frame.data[i+2]) / 3;
+      const gray2 = (lastFrame.data[i] + lastFrame.data[i+1] + lastFrame.data[i+2]) / 3;
+      diffSum += Math.abs(gray1 - gray2);
+    }
+    const pixels = frame.data.length / 4;
+    const motionPct = Math.min(100, (diffSum / pixels) * 2);
+    motionMeter.style.width = motionPct + '%';
+
+    const threshold = parseInt($('sensitivity').value, 10);
+    const motionDetected = motionPct > (31 - threshold);
+
+    if (autoEnabled){
+      if (motionDetected){
+        if (!barrierOpen){
+          setBarrier(true);
+        }
+        clearTimeout(noMotionTimer);
+        noMotionTimer = setTimeout(() => {
+          if (barrierOpen) setBarrier(false);
+        }, 4000);
+      }
+    }
+  }
+  lastFrame = frame;
+  requestAnimationFrame(detectLoop);
+}
+
+startCamera();
+log('Página lista. Conectá la micro:bit para empezar.');
+</script>
+</body>
+</html>
