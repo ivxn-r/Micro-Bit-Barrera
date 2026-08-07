@@ -166,13 +166,15 @@
   .log{
     font-size:12px;
     color:var(--muted);
-    max-height:150px;
+    max-height:170px;
     overflow-y:auto;
     display:flex;
     flex-direction:column;
     gap:4px;
   }
   .log div span{color:var(--text);}
+  .log div.err{color:var(--accent-red);}
+  .log div.ok{color:var(--accent-green);}
   .hint{
     font-size:12px;
     color:var(--muted);
@@ -214,7 +216,7 @@
   <div class="panel">
     <p class="panel-title">Paso 1 — Preparar la micro:bit</p>
     <ol class="steps">
-      <li>Código con <span>bluetooth.startUartService()</span> cargado en MakeCode</li>
+      <li>Código combinado (botones + Bluetooth) cargado en MakeCode</li>
       <li>Project Settings → <span>No pairing required</span> activado</li>
       <li>Servo alimentado con pilas/cargador, tierras unidas</li>
     </ol>
@@ -226,11 +228,15 @@
       <span>micro:bit</span>
       <span class="pill off" id="bleStatus">Desconectado</span>
     </div>
+    <div class="status-row">
+      <span>Tipo de escritura</span>
+      <span class="pill off" id="writeType">—</span>
+    </div>
     <button class="btn-primary" id="connectBtn" style="margin-top:10px;">Conectar micro:bit</button>
   </div>
 
   <div class="panel">
-    <p class="panel-title">Paso 3 — Prueba manual (hacé esto primero)</p>
+    <p class="panel-title">Paso 3 — Prueba manual</p>
     <div class="status-row">
       <span>Posición</span>
       <span class="pill closed" id="barrierStatus">Cerrada</span>
@@ -239,7 +245,7 @@
       <button class="btn-open" id="openBtn" disabled>Abrir</button>
       <button class="btn-close" id="closeBtn" disabled>Cerrar</button>
     </div>
-    <p class="hint">Probá estos botones antes de activar la cámara. Si el servo responde acá, todo el resto va a funcionar.</p>
+    <p class="hint">En la micro:bit debería aparecer el texto "OPEN" o "CLOSE" pasando por la pantalla, y después el ✓ o la ✗.</p>
   </div>
 
   <div class="panel">
@@ -280,6 +286,7 @@ let barrierOpen = false;
 let autoEnabled = true;
 let noMotionTimer = null;
 let lastFrame = null;
+let writeMethod = null; // 'withoutResponse' | 'withResponse' | 'legacy'
 
 const $ = (id) => document.getElementById(id);
 const logEl = $('log');
@@ -292,9 +299,11 @@ const canvas = $('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
 const openBtn = $('openBtn');
 const closeBtn = $('closeBtn');
+const writeTypeEl = $('writeType');
 
-function log(msg){
+function log(msg, kind){
   const line = document.createElement('div');
+  if (kind) line.className = kind;
   const time = new Date().toLocaleTimeString();
   line.innerHTML = `<span>[${time}]</span> ${msg}`;
   logEl.prepend(line);
@@ -316,36 +325,59 @@ $('connectBtn').addEventListener('click', async () => {
     const service = await server.getPrimaryService(UART_SERVICE);
     rxCharacteristic = await service.getCharacteristic(UART_RX);
 
+    const props = rxCharacteristic.properties;
+    log('Propiedades de la característica RX: write=' + props.write +
+        ', writeWithoutResponse=' + props.writeWithoutResponse);
+
+    if (props.writeWithoutResponse) {
+      writeMethod = 'withoutResponse';
+    } else if (props.write) {
+      writeMethod = 'withResponse';
+    } else {
+      writeMethod = 'legacy';
+    }
+    writeTypeEl.textContent = writeMethod;
+    writeTypeEl.className = 'pill connected';
+
     bleStatus.textContent = 'Conectado';
     bleStatus.className = 'pill connected';
     $('connectBtn').textContent = 'Conectado ✓';
     $('connectBtn').disabled = true;
     openBtn.disabled = false;
     closeBtn.disabled = false;
-    log('Conexión Bluetooth establecida. Probá los botones manuales del Paso 3.');
+    log('Conexión establecida. Usando escritura: ' + writeMethod, 'ok');
 
     bleDevice.addEventListener('gattserverdisconnected', () => {
       bleStatus.textContent = 'Desconectado';
       bleStatus.className = 'pill off';
+      writeTypeEl.textContent = '—';
+      writeTypeEl.className = 'pill off';
       $('connectBtn').textContent = 'Conectar micro:bit';
       $('connectBtn').disabled = false;
       openBtn.disabled = true;
       closeBtn.disabled = true;
-      log('Se perdió la conexión con la micro:bit.');
+      log('Se perdió la conexión con la micro:bit.', 'err');
     });
   } catch (err) {
-    log('Error al conectar: ' + err.message);
+    log('Error al conectar: ' + err.message, 'err');
   }
 });
 
 async function sendCommand(cmd){
-  if (!rxCharacteristic) { log('No hay conexión Bluetooth activa.'); return; }
+  if (!rxCharacteristic) { log('No hay conexión Bluetooth activa.', 'err'); return; }
   const encoder = new TextEncoder();
+  const bytes = encoder.encode(cmd + '\n');
   try {
-    await rxCharacteristic.writeValue(encoder.encode(cmd + '\n'));
-    log('Enviado: ' + cmd);
+    if (writeMethod === 'withoutResponse' && rxCharacteristic.writeValueWithoutResponse) {
+      await rxCharacteristic.writeValueWithoutResponse(bytes);
+    } else if (writeMethod === 'withResponse' && rxCharacteristic.writeValueWithResponse) {
+      await rxCharacteristic.writeValueWithResponse(bytes);
+    } else {
+      await rxCharacteristic.writeValue(bytes);
+    }
+    log('Enviado (' + writeMethod + '): ' + cmd, 'ok');
   } catch (err) {
-    log('Error al enviar: ' + err.message);
+    log('Error al enviar: ' + err.message, 'err');
   }
 }
 
@@ -378,7 +410,7 @@ async function startCamera(){
     });
     log('Cámara iniciada.');
   } catch (err) {
-    log('No se pudo acceder a la cámara: ' + err.message);
+    log('No se pudo acceder a la cámara: ' + err.message, 'err');
   }
 }
 
