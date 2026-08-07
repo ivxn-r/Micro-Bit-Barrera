@@ -93,6 +93,7 @@
     padding:10px 0;
     border-bottom:1px solid var(--border);
     font-size:14px;
+    gap:10px;
   }
   .status-row:last-child{border-bottom:none;}
   .pill{
@@ -103,6 +104,7 @@
     font-size:13px;
     padding:4px 12px;
     border-radius:100px;
+    white-space:nowrap;
   }
   .pill.off{background:var(--surface-2); color:var(--muted);}
   .pill.connected{background:rgba(76,195,138,0.15); color:var(--accent-green);}
@@ -110,10 +112,11 @@
   .pill.closed{background:rgba(232,92,74,0.15); color:var(--accent-red);}
   .meter{
     height:8px;
-    width:120px;
+    width:110px;
     background:var(--surface-2);
     border-radius:100px;
     overflow:hidden;
+    flex-shrink:0;
   }
   .meter-fill{
     height:100%;
@@ -148,6 +151,7 @@
     position:relative; width:44px; height:24px;
     background:var(--surface-2); border-radius:100px;
     cursor:pointer; border:1px solid var(--border);
+    flex-shrink:0;
   }
   .switch.on{background:rgba(76,195,138,0.3);}
   .switch::after{
@@ -162,7 +166,7 @@
   .log{
     font-size:12px;
     color:var(--muted);
-    max-height:130px;
+    max-height:150px;
     overflow-y:auto;
     display:flex;
     flex-direction:column;
@@ -175,7 +179,7 @@
     line-height:1.5;
     margin-top:10px;
   }
-  #notSupported{
+  .browser-banner{
     display:none;
     background:rgba(232,92,74,0.12);
     border:1px solid var(--accent-red);
@@ -183,8 +187,16 @@
     padding:12px 14px;
     border-radius:8px;
     font-size:13px;
-    margin-bottom:14px;
+    line-height:1.5;
   }
+  .steps{
+    font-size:13px;
+    color:var(--muted);
+    line-height:1.8;
+    padding-left:18px;
+    margin:0;
+  }
+  .steps li span{color:var(--text);}
 </style>
 </head>
 <body>
@@ -195,12 +207,21 @@
 </header>
 
 <main>
-  <div id="notSupported">
-    ⚠ Este navegador no soporta Web Bluetooth. Abrí esta página en <span style="color:var(--text)">Chrome o Edge</span> (Android o computadora).
+  <div class="browser-banner" id="browserBanner">
+    ⚠ Este navegador no soporta Web Bluetooth. Abrí esta página en <span style="color:var(--text)">Chrome o Edge</span> en Android o computadora — no funciona en Safari, Firefox ni Samsung Internet.
   </div>
 
   <div class="panel">
-    <p class="panel-title">Conexión</p>
+    <p class="panel-title">Paso 1 — Preparar la micro:bit</p>
+    <ol class="steps">
+      <li>Código con <span>bluetooth.startUartService()</span> cargado en MakeCode</li>
+      <li>Project Settings → <span>No pairing required</span> activado</li>
+      <li>Servo alimentado con pilas/cargador, tierras unidas</li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Paso 2 — Conexión Bluetooth</p>
     <div class="status-row">
       <span>micro:bit</span>
       <span class="pill off" id="bleStatus">Desconectado</span>
@@ -209,7 +230,20 @@
   </div>
 
   <div class="panel">
-    <p class="panel-title">Cámara — Detección de movimiento</p>
+    <p class="panel-title">Paso 3 — Prueba manual (hacé esto primero)</p>
+    <div class="status-row">
+      <span>Posición</span>
+      <span class="pill closed" id="barrierStatus">Cerrada</span>
+    </div>
+    <div class="btn-row" style="margin-top:10px;">
+      <button class="btn-open" id="openBtn" disabled>Abrir</button>
+      <button class="btn-close" id="closeBtn" disabled>Cerrar</button>
+    </div>
+    <p class="hint">Probá estos botones antes de activar la cámara. Si el servo responde acá, todo el resto va a funcionar.</p>
+  </div>
+
+  <div class="panel">
+    <p class="panel-title">Paso 4 — Cámara y detección automática</p>
     <video id="video" autoplay playsinline muted></video>
     <canvas id="canvas" style="display:none;"></canvas>
     <div class="status-row" style="margin-top:10px;">
@@ -220,23 +254,14 @@
       <span>Sensibilidad</span>
       <input type="range" id="sensitivity" min="1" max="30" value="10" style="width:140px;">
     </div>
+    <div class="status-row">
+      <span>Segundos sin movimiento para cerrar</span>
+      <input type="range" id="closeDelay" min="2" max="10" value="4" style="width:100px;">
+    </div>
     <div class="toggle-row" style="padding-top:10px;">
       <span>Detección automática</span>
       <div class="switch on" id="autoToggle"></div>
     </div>
-  </div>
-
-  <div class="panel">
-    <p class="panel-title">Estado de la barrera</p>
-    <div class="status-row">
-      <span>Posición</span>
-      <span class="pill closed" id="barrierStatus">Cerrada</span>
-    </div>
-    <div class="btn-row" style="margin-top:10px;">
-      <button class="btn-open" id="openBtn">Abrir</button>
-      <button class="btn-close" id="closeBtn">Cerrar</button>
-    </div>
-    <p class="hint">Los botones manuales funcionan siempre. La detección automática abre la barrera al ver movimiento y la cierra a los pocos segundos de quietud.</p>
   </div>
 
   <div class="panel">
@@ -247,8 +272,7 @@
 
 <script>
 const UART_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const UART_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // escribimos aquí (RX del microbit)
-const UART_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notificaciones del microbit
+const UART_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
 let rxCharacteristic = null;
 let bleDevice = null;
@@ -266,6 +290,8 @@ const autoToggle = $('autoToggle');
 const video = $('video');
 const canvas = $('canvas');
 const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const openBtn = $('openBtn');
+const closeBtn = $('closeBtn');
 
 function log(msg){
   const line = document.createElement('div');
@@ -275,11 +301,10 @@ function log(msg){
 }
 
 if (!navigator.bluetooth) {
-  $('notSupported').style.display = 'block';
+  $('browserBanner').style.display = 'block';
   $('connectBtn').disabled = true;
 }
 
-// --- Conexión Bluetooth ---
 $('connectBtn').addEventListener('click', async () => {
   try {
     bleDevice = await navigator.bluetooth.requestDevice({
@@ -295,13 +320,17 @@ $('connectBtn').addEventListener('click', async () => {
     bleStatus.className = 'pill connected';
     $('connectBtn').textContent = 'Conectado ✓';
     $('connectBtn').disabled = true;
-    log('Conexión Bluetooth establecida.');
+    openBtn.disabled = false;
+    closeBtn.disabled = false;
+    log('Conexión Bluetooth establecida. Probá los botones manuales del Paso 3.');
 
     bleDevice.addEventListener('gattserverdisconnected', () => {
       bleStatus.textContent = 'Desconectado';
       bleStatus.className = 'pill off';
       $('connectBtn').textContent = 'Conectar micro:bit';
       $('connectBtn').disabled = false;
+      openBtn.disabled = true;
+      closeBtn.disabled = true;
       log('Se perdió la conexión con la micro:bit.');
     });
   } catch (err) {
@@ -327,8 +356,8 @@ function setBarrier(open){
   sendCommand(open ? 'OPEN' : 'CLOSE');
 }
 
-$('openBtn').addEventListener('click', () => setBarrier(true));
-$('closeBtn').addEventListener('click', () => setBarrier(false));
+openBtn.addEventListener('click', () => setBarrier(true));
+closeBtn.addEventListener('click', () => setBarrier(false));
 
 autoToggle.addEventListener('click', () => {
   autoEnabled = !autoEnabled;
@@ -336,7 +365,6 @@ autoToggle.addEventListener('click', () => {
   log('Detección automática ' + (autoEnabled ? 'activada' : 'desactivada') + '.');
 });
 
-// --- Cámara y detección de movimiento ---
 async function startCamera(){
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -370,9 +398,10 @@ function detectLoop(){
     motionMeter.style.width = motionPct + '%';
 
     const threshold = parseInt($('sensitivity').value, 10);
+    const closeDelaySec = parseInt($('closeDelay').value, 10);
     const motionDetected = motionPct > (31 - threshold);
 
-    if (autoEnabled){
+    if (autoEnabled && rxCharacteristic){
       if (motionDetected){
         if (!barrierOpen){
           setBarrier(true);
@@ -380,7 +409,7 @@ function detectLoop(){
         clearTimeout(noMotionTimer);
         noMotionTimer = setTimeout(() => {
           if (barrierOpen) setBarrier(false);
-        }, 4000);
+        }, closeDelaySec * 1000);
       }
     }
   }
