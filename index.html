@@ -1,456 +1,472 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Barrera — micro:bit</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#14171a;
-    --surface:#1c2024;
-    --surface-2:#242a2f;
-    --hazard-yellow:#ffc933;
-    --accent-red:#e85c4a;
-    --accent-green:#4cc38a;
-    --text:#edeef0;
-    --muted:#868e96;
-    --border:#2e353b;
-  }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
-  body{
-    background:var(--bg);
-    color:var(--text);
-    font-family:'IBM Plex Mono', monospace;
-    min-height:100vh;
-    padding-bottom:40px;
-  }
-  .hazard-bar{
-    height:10px;
-    width:100%;
-    background:repeating-linear-gradient(
-      135deg,
-      var(--hazard-yellow) 0px, var(--hazard-yellow) 18px,
-      #14171a 18px, #14171a 36px
-    );
-  }
-  header{
-    padding:28px 20px 18px;
-    text-align:center;
-  }
-  h1{
-    font-family:'Barlow Condensed', sans-serif;
-    font-weight:800;
-    font-size:clamp(28px, 6vw, 42px);
-    text-transform:uppercase;
-    letter-spacing:0.04em;
-    margin:0;
-  }
-  .eyebrow{
-    font-size:12px;
-    color:var(--muted);
-    letter-spacing:0.18em;
-    text-transform:uppercase;
-    margin-bottom:6px;
-  }
-  main{
-    max-width:520px;
-    margin:0 auto;
-    padding:0 16px;
-    display:flex;
-    flex-direction:column;
-    gap:16px;
-  }
-  .panel{
-    background:var(--surface);
-    border:1px solid var(--border);
-    border-radius:10px;
-    padding:16px;
-  }
-  .panel-title{
-    font-family:'Barlow Condensed', sans-serif;
-    font-weight:700;
-    text-transform:uppercase;
-    letter-spacing:0.08em;
-    font-size:14px;
-    color:var(--muted);
-    margin:0 0 12px;
-  }
-  video{
-    width:100%;
-    border-radius:8px;
-    background:#000;
-    display:block;
-    aspect-ratio:4/3;
-    object-fit:cover;
-  }
-  .status-row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    padding:10px 0;
-    border-bottom:1px solid var(--border);
-    font-size:14px;
-    gap:10px;
-  }
-  .status-row:last-child{border-bottom:none;}
-  .pill{
-    font-family:'Barlow Condensed', sans-serif;
-    font-weight:700;
-    text-transform:uppercase;
-    letter-spacing:0.05em;
-    font-size:13px;
-    padding:4px 12px;
-    border-radius:100px;
-    white-space:nowrap;
-  }
-  .pill.off{background:var(--surface-2); color:var(--muted);}
-  .pill.connected{background:rgba(76,195,138,0.15); color:var(--accent-green);}
-  .pill.open{background:rgba(76,195,138,0.15); color:var(--accent-green);}
-  .pill.closed{background:rgba(232,92,74,0.15); color:var(--accent-red);}
-  .meter{
-    height:8px;
-    width:110px;
-    background:var(--surface-2);
-    border-radius:100px;
-    overflow:hidden;
-    flex-shrink:0;
-  }
-  .meter-fill{
-    height:100%;
-    width:0%;
-    background:var(--hazard-yellow);
-    transition:width 0.1s linear;
-  }
-  button{
-    font-family:'Barlow Condensed', sans-serif;
-    font-weight:700;
-    text-transform:uppercase;
-    letter-spacing:0.05em;
-    font-size:15px;
-    border:none;
-    border-radius:8px;
-    padding:13px 16px;
-    cursor:pointer;
-    transition:filter 0.15s;
-  }
-  button:hover{filter:brightness(1.1);}
-  button:active{filter:brightness(0.9);}
-  button:disabled{opacity:0.4; cursor:not-allowed;}
-  .btn-primary{background:var(--hazard-yellow); color:#14171a; width:100%;}
-  .btn-row{display:flex; gap:10px;}
-  .btn-open{background:rgba(76,195,138,0.15); color:var(--accent-green); flex:1;}
-  .btn-close{background:rgba(232,92,74,0.15); color:var(--accent-red); flex:1;}
-  .toggle-row{
-    display:flex; align-items:center; justify-content:space-between;
-    font-size:14px;
-  }
-  .switch{
-    position:relative; width:44px; height:24px;
-    background:var(--surface-2); border-radius:100px;
-    cursor:pointer; border:1px solid var(--border);
-    flex-shrink:0;
-  }
-  .switch.on{background:rgba(76,195,138,0.3);}
-  .switch::after{
-    content:''; position:absolute; top:2px; left:2px;
-    width:18px; height:18px; border-radius:50%;
-    background:var(--muted); transition:0.2s;
-  }
-  .switch.on::after{background:var(--accent-green); left:22px;}
-  input[type=range]{
-    width:100%; accent-color:var(--hazard-yellow);
-  }
-  .log{
-    font-size:12px;
-    color:var(--muted);
-    max-height:170px;
-    overflow-y:auto;
-    display:flex;
-    flex-direction:column;
-    gap:4px;
-  }
-  .log div span{color:var(--text);}
-  .log div.err{color:var(--accent-red);}
-  .log div.ok{color:var(--accent-green);}
-  .hint{
-    font-size:12px;
-    color:var(--muted);
-    line-height:1.5;
-    margin-top:10px;
-  }
-  .browser-banner{
-    display:none;
-    background:rgba(232,92,74,0.12);
-    border:1px solid var(--accent-red);
-    color:var(--accent-red);
-    padding:12px 14px;
-    border-radius:8px;
-    font-size:13px;
-    line-height:1.5;
-  }
-  .steps{
-    font-size:13px;
-    color:var(--muted);
-    line-height:1.8;
-    padding-left:18px;
-    margin:0;
-  }
-  .steps li span{color:var(--text);}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Control Servo - micro:bit</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+
+            font-family: Arial, sans-serif;
+
+            background: #111827;
+            color: white;
+
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 500px;
+
+            background: #1f2937;
+
+            padding: 30px;
+
+            border-radius: 20px;
+
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #9ca3af;
+            margin-bottom: 25px;
+        }
+
+        .status {
+            padding: 12px;
+
+            border-radius: 10px;
+
+            background: #374151;
+
+            margin-bottom: 25px;
+
+            font-weight: bold;
+        }
+
+        .connected {
+            background: #166534;
+        }
+
+        .disconnected {
+            background: #7f1d1d;
+        }
+
+        button {
+            border: none;
+
+            padding: 13px 20px;
+
+            border-radius: 10px;
+
+            cursor: pointer;
+
+            font-size: 16px;
+
+            font-weight: bold;
+
+            background: #2563eb;
+
+            color: white;
+
+            margin: 5px;
+
+            transition: 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+
+            background: #1d4ed8;
+        }
+
+        button:disabled {
+            background: #4b5563;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .angle {
+            font-size: 55px;
+
+            font-weight: bold;
+
+            margin: 25px 0;
+        }
+
+        input[type="range"] {
+            width: 100%;
+
+            cursor: pointer;
+        }
+
+        .range-labels {
+            display: flex;
+
+            justify-content: space-between;
+
+            color: #9ca3af;
+
+            margin-top: 8px;
+        }
+
+        .presets {
+            margin-top: 25px;
+        }
+
+        .disconnect {
+            background: #dc2626;
+        }
+
+        .disconnect:hover {
+            background: #b91c1c;
+        }
+
+        .info {
+            margin-top: 25px;
+
+            color: #9ca3af;
+
+            font-size: 13px;
+        }
+    </style>
 </head>
+
 <body>
-<div class="hazard-bar"></div>
-<header>
-  <div class="eyebrow">Proyecto micro:bit</div>
-  <h1>Control de Barrera</h1>
-</header>
 
-<main>
-  <div class="browser-banner" id="browserBanner">
-    ⚠ Este navegador no soporta Web Bluetooth. Abrí esta página en <span style="color:var(--text)">Chrome o Edge</span> en Android o computadora — no funciona en Safari, Firefox ni Samsung Internet.
-  </div>
+<div class="container">
 
-  <div class="panel">
-    <p class="panel-title">Paso 1 — Preparar la micro:bit</p>
-    <ol class="steps">
-      <li>Código combinado (botones + Bluetooth) cargado en MakeCode</li>
-      <li>Project Settings → <span>No pairing required</span> activado</li>
-      <li>Servo alimentado con pilas/cargador, tierras unidas</li>
-    </ol>
-  </div>
+    <h1>🤖 Control del Servo</h1>
 
-  <div class="panel">
-    <p class="panel-title">Paso 2 — Conexión Bluetooth</p>
-    <div class="status-row">
-      <span>micro:bit</span>
-      <span class="pill off" id="bleStatus">Desconectado</span>
+    <div class="subtitle">
+        micro:bit V1.5 · Bluetooth
     </div>
-    <div class="status-row">
-      <span>Tipo de escritura</span>
-      <span class="pill off" id="writeType">—</span>
-    </div>
-    <button class="btn-primary" id="connectBtn" style="margin-top:10px;">Conectar micro:bit</button>
-  </div>
 
-  <div class="panel">
-    <p class="panel-title">Paso 3 — Prueba manual</p>
-    <div class="status-row">
-      <span>Posición</span>
-      <span class="pill closed" id="barrierStatus">Cerrada</span>
+    <div id="status" class="status disconnected">
+        🔴 Desconectado
     </div>
-    <div class="btn-row" style="margin-top:10px;">
-      <button class="btn-open" id="openBtn" disabled>Abrir</button>
-      <button class="btn-close" id="closeBtn" disabled>Cerrar</button>
-    </div>
-    <p class="hint">En la micro:bit debería aparecer el texto "OPEN" o "CLOSE" pasando por la pantalla, y después el ✓ o la ✗.</p>
-  </div>
 
-  <div class="panel">
-    <p class="panel-title">Paso 4 — Cámara y detección automática</p>
-    <video id="video" autoplay playsinline muted></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <div class="status-row" style="margin-top:10px;">
-      <span>Movimiento</span>
-      <div class="meter"><div class="meter-fill" id="motionMeter"></div></div>
-    </div>
-    <div class="status-row">
-      <span>Sensibilidad</span>
-      <input type="range" id="sensitivity" min="1" max="30" value="10" style="width:140px;">
-    </div>
-    <div class="status-row">
-      <span>Segundos sin movimiento para cerrar</span>
-      <input type="range" id="closeDelay" min="2" max="10" value="4" style="width:100px;">
-    </div>
-    <div class="toggle-row" style="padding-top:10px;">
-      <span>Detección automática</span>
-      <div class="switch on" id="autoToggle"></div>
-    </div>
-  </div>
+    <button id="connectButton">
+        🔵 Conectar micro:bit
+    </button>
 
-  <div class="panel">
-    <p class="panel-title">Registro</p>
-    <div class="log" id="log"></div>
-  </div>
-</main>
+    <div class="angle">
+        <span id="angleValue">90</span>°
+    </div>
+
+    <input
+        type="range"
+        id="angleSlider"
+        min="0"
+        max="180"
+        value="90"
+    >
+
+    <div class="range-labels">
+        <span>0°</span>
+        <span>90°</span>
+        <span>180°</span>
+    </div>
+
+    <div class="presets">
+
+        <button onclick="setAngle(0)">
+            0°
+        </button>
+
+        <button onclick="setAngle(45)">
+            45°
+        </button>
+
+        <button onclick="setAngle(90)">
+            90°
+        </button>
+
+        <button onclick="setAngle(135)">
+            135°
+        </button>
+
+        <button onclick="setAngle(180)">
+            180°
+        </button>
+
+    </div>
+
+    <br>
+
+    <button
+        id="disconnectButton"
+        class="disconnect"
+        disabled
+    >
+        🔴 Desconectar
+    </button>
+
+    <div class="info">
+        Control inalámbrico mediante Bluetooth Low Energy
+    </div>
+
+</div>
+
 
 <script>
-const UART_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-const UART_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
-let rxCharacteristic = null;
-let bleDevice = null;
-let barrierOpen = false;
-let autoEnabled = true;
-let noMotionTimer = null;
-let lastFrame = null;
-let writeMethod = null; // 'withoutResponse' | 'withResponse' | 'legacy'
+    // UUID del servicio UART del micro:bit
+    const UART_SERVICE_UUID =
+        "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 
-const $ = (id) => document.getElementById(id);
-const logEl = $('log');
-const bleStatus = $('bleStatus');
-const barrierStatus = $('barrierStatus');
-const motionMeter = $('motionMeter');
-const autoToggle = $('autoToggle');
-const video = $('video');
-const canvas = $('canvas');
-const ctx = canvas.getContext('2d', { willReadFrequently: true });
-const openBtn = $('openBtn');
-const closeBtn = $('closeBtn');
-const writeTypeEl = $('writeType');
+    // Característica utilizada para enviar datos
+    // desde el navegador hacia el micro:bit
+    const UART_TX_CHARACTERISTIC_UUID =
+        "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
-function log(msg, kind){
-  const line = document.createElement('div');
-  if (kind) line.className = kind;
-  const time = new Date().toLocaleTimeString();
-  line.innerHTML = `<span>[${time}]</span> ${msg}`;
-  logEl.prepend(line);
-}
 
-if (!navigator.bluetooth) {
-  $('browserBanner').style.display = 'block';
-  $('connectBtn').disabled = true;
-}
+    let device = null;
+    let server = null;
+    let txCharacteristic = null;
 
-$('connectBtn').addEventListener('click', async () => {
-  try {
-    bleDevice = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'BBC micro:bit' }],
-      optionalServices: [UART_SERVICE]
-    });
-    log('Emparejando con ' + bleDevice.name + '...');
-    const server = await bleDevice.gatt.connect();
-    const service = await server.getPrimaryService(UART_SERVICE);
-    rxCharacteristic = await service.getCharacteristic(UART_RX);
 
-    const props = rxCharacteristic.properties;
-    log('Propiedades de la característica RX: write=' + props.write +
-        ', writeWithoutResponse=' + props.writeWithoutResponse);
+    const connectButton =
+        document.getElementById("connectButton");
 
-    if (props.writeWithoutResponse) {
-      writeMethod = 'withoutResponse';
-    } else if (props.write) {
-      writeMethod = 'withResponse';
-    } else {
-      writeMethod = 'legacy';
-    }
-    writeTypeEl.textContent = writeMethod;
-    writeTypeEl.className = 'pill connected';
+    const disconnectButton =
+        document.getElementById("disconnectButton");
 
-    bleStatus.textContent = 'Conectado';
-    bleStatus.className = 'pill connected';
-    $('connectBtn').textContent = 'Conectado ✓';
-    $('connectBtn').disabled = true;
-    openBtn.disabled = false;
-    closeBtn.disabled = false;
-    log('Conexión establecida. Usando escritura: ' + writeMethod, 'ok');
+    const status =
+        document.getElementById("status");
 
-    bleDevice.addEventListener('gattserverdisconnected', () => {
-      bleStatus.textContent = 'Desconectado';
-      bleStatus.className = 'pill off';
-      writeTypeEl.textContent = '—';
-      writeTypeEl.className = 'pill off';
-      $('connectBtn').textContent = 'Conectar micro:bit';
-      $('connectBtn').disabled = false;
-      openBtn.disabled = true;
-      closeBtn.disabled = true;
-      log('Se perdió la conexión con la micro:bit.', 'err');
-    });
-  } catch (err) {
-    log('Error al conectar: ' + err.message, 'err');
-  }
-});
+    const slider =
+        document.getElementById("angleSlider");
 
-async function sendCommand(cmd){
-  if (!rxCharacteristic) { log('No hay conexión Bluetooth activa.', 'err'); return; }
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(cmd + '\n');
-  try {
-    if (writeMethod === 'withoutResponse' && rxCharacteristic.writeValueWithoutResponse) {
-      await rxCharacteristic.writeValueWithoutResponse(bytes);
-    } else if (writeMethod === 'withResponse' && rxCharacteristic.writeValueWithResponse) {
-      await rxCharacteristic.writeValueWithResponse(bytes);
-    } else {
-      await rxCharacteristic.writeValue(bytes);
-    }
-    log('Enviado (' + writeMethod + '): ' + cmd, 'ok');
-  } catch (err) {
-    log('Error al enviar: ' + err.message, 'err');
-  }
-}
+    const angleValue =
+        document.getElementById("angleValue");
 
-function setBarrier(open){
-  barrierOpen = open;
-  barrierStatus.textContent = open ? 'Abierta' : 'Cerrada';
-  barrierStatus.className = 'pill ' + (open ? 'open' : 'closed');
-  sendCommand(open ? 'OPEN' : 'CLOSE');
-}
 
-openBtn.addEventListener('click', () => setBarrier(true));
-closeBtn.addEventListener('click', () => setBarrier(false));
+    // ------------------------------
+    // CONECTAR
+    // ------------------------------
 
-autoToggle.addEventListener('click', () => {
-  autoEnabled = !autoEnabled;
-  autoToggle.classList.toggle('on', autoEnabled);
-  log('Detección automática ' + (autoEnabled ? 'activada' : 'desactivada') + '.');
-});
+    connectButton.addEventListener("click", async () => {
 
-async function startCamera(){
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' }, audio: false
-    });
-    video.srcObject = stream;
-    video.addEventListener('loadedmetadata', () => {
-      canvas.width = 80;
-      canvas.height = 60;
-      requestAnimationFrame(detectLoop);
-    });
-    log('Cámara iniciada.');
-  } catch (err) {
-    log('No se pudo acceder a la cámara: ' + err.message, 'err');
-  }
-}
+        try {
 
-function detectLoop(){
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            if (!navigator.bluetooth) {
 
-  if (lastFrame){
-    let diffSum = 0;
-    for (let i = 0; i < frame.data.length; i += 4){
-      const gray1 = (frame.data[i] + frame.data[i+1] + frame.data[i+2]) / 3;
-      const gray2 = (lastFrame.data[i] + lastFrame.data[i+1] + lastFrame.data[i+2]) / 3;
-      diffSum += Math.abs(gray1 - gray2);
-    }
-    const pixels = frame.data.length / 4;
-    const motionPct = Math.min(100, (diffSum / pixels) * 2);
-    motionMeter.style.width = motionPct + '%';
+                alert(
+                    "Tu navegador no soporta Web Bluetooth."
+                );
 
-    const threshold = parseInt($('sensitivity').value, 10);
-    const closeDelaySec = parseInt($('closeDelay').value, 10);
-    const motionDetected = motionPct > (31 - threshold);
+                return;
+            }
 
-    if (autoEnabled && rxCharacteristic){
-      if (motionDetected){
-        if (!barrierOpen){
-          setBarrier(true);
+
+            status.textContent =
+                "🟡 Buscando micro:bit...";
+
+            status.className = "status";
+
+
+            device = await navigator.bluetooth.requestDevice({
+
+                filters: [
+                    {
+                        services: [UART_SERVICE_UUID]
+                    }
+                ]
+
+            });
+
+
+            device.addEventListener(
+                "gattserverdisconnected",
+                disconnected
+            );
+
+
+            status.textContent =
+                "🟡 Conectando...";
+
+
+            server =
+                await device.gatt.connect();
+
+
+            const service =
+                await server.getPrimaryService(
+                    UART_SERVICE_UUID
+                );
+
+
+            txCharacteristic =
+                await service.getCharacteristic(
+                    UART_TX_CHARACTERISTIC_UUID
+                );
+
+
+            status.textContent =
+                "🟢 micro:bit conectado";
+
+            status.className =
+                "status connected";
+
+
+            connectButton.disabled = true;
+
+            disconnectButton.disabled = false;
+
+            slider.disabled = false;
+
+
+            // Enviar el ángulo inicial
+            await sendAngle(
+                parseInt(slider.value)
+            );
+
+
+        } catch (error) {
+
+            console.error(error);
+
+            status.textContent =
+                "🔴 Error de conexión";
+
+            status.className =
+                "status disconnected";
+
+            alert(
+                "No se pudo conectar al micro:bit.\n\n" +
+                error
+            );
         }
-        clearTimeout(noMotionTimer);
-        noMotionTimer = setTimeout(() => {
-          if (barrierOpen) setBarrier(false);
-        }, closeDelaySec * 1000);
-      }
-    }
-  }
-  lastFrame = frame;
-  requestAnimationFrame(detectLoop);
-}
 
-startCamera();
-log('Página lista. Conectá la micro:bit para empezar.');
+    });
+
+
+    // ------------------------------
+    // SLIDER
+    // ------------------------------
+
+    slider.addEventListener("input", async () => {
+
+        const angle =
+            parseInt(slider.value);
+
+        angleValue.textContent =
+            angle;
+
+        await sendAngle(angle);
+
+    });
+
+
+    // ------------------------------
+    // CAMBIAR ÁNGULO
+    // ------------------------------
+
+    async function setAngle(angle) {
+
+        slider.value = angle;
+
+        angleValue.textContent = angle;
+
+        await sendAngle(angle);
+
+    }
+
+
+    // ------------------------------
+    // ENVIAR ÁNGULO
+    // ------------------------------
+
+    async function sendAngle(angle) {
+
+        if (!txCharacteristic) {
+            return;
+        }
+
+        try {
+
+            // El micro:bit espera:
+            // "90\n"
+            const data =
+                new TextEncoder().encode(
+                    angle + "\n"
+                );
+
+            await txCharacteristic.writeValue(data);
+
+        } catch (error) {
+
+            console.error(
+                "Error enviando:",
+                error
+            );
+
+        }
+
+    }
+
+
+    // ------------------------------
+    // DESCONECTAR
+    // ------------------------------
+
+    disconnectButton.addEventListener(
+        "click",
+        () => {
+
+            if (
+                device &&
+                device.gatt.connected
+            ) {
+
+                device.gatt.disconnect();
+
+            }
+
+        }
+    );
+
+
+    // ------------------------------
+    // EVENTO DESCONEXIÓN
+    // ------------------------------
+
+    function disconnected() {
+
+        status.textContent =
+            "🔴 Desconectado";
+
+        status.className =
+            "status disconnected";
+
+        connectButton.disabled = false;
+
+        disconnectButton.disabled = true;
+
+        txCharacteristic = null;
+
+    }
+
 </script>
+
 </body>
 </html>
