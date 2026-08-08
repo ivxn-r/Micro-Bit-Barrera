@@ -1,378 +1,593 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control de Servomotor - Micro:Bit v1.5</title>
-    <style>
-        :root {
-            --bg-color: #0f172a;
-            --card-bg: #1e293b;
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
-            --success: #10b981;
-            --danger: #ef4444;
-            --text-main: #f8fafc;
-            --text-sub: #94a3b8;
-            --border: #334155;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SERVO::CTRL — Micro:Bit BLE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0a1410;
+    --bg-panel: #0f1e17;
+    --bg-panel-2: #0c1813;
+    --grid-line: rgba(92,230,124,0.055);
+    --copper: #c9793f;
+    --copper-dim: #7a4d2c;
+    --phosphor: #5ce67c;
+    --phosphor-dim: #2f6b45;
+    --phosphor-glow: rgba(92,230,124,0.35);
+    --amber: #ffb020;
+    --text: #e9f3ec;
+    --text-dim: #7fa08c;
+    --danger: #ff5c5c;
+    --border: #1c3227;
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/28px 28px,
+      radial-gradient(ellipse at top, #0d1c15 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    padding: 28px 16px 60px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:16px; flex-wrap:wrap;
+    border-bottom:1px solid var(--border);
+    padding-bottom:18px; margin-bottom:22px;
+  }
+  .brand{display:flex; align-items:center; gap:12px;}
+  .brand .dot{
+    width:10px; height:10px; border-radius:50%;
+    background: var(--phosphor-dim);
+    box-shadow:0 0 0 3px rgba(92,230,124,0.08);
+    transition: background .25s, box-shadow .25s;
+  }
+  .brand .dot.live{ background:var(--phosphor); box-shadow:0 0 12px 2px var(--phosphor-glow);}
+  .brand .dot.warn{ background:var(--amber); box-shadow:0 0 12px 2px rgba(255,176,32,.35);}
+  .brand h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:20px; font-weight:700; letter-spacing:.5px; margin:0;
+    color: var(--text);
+  }
+  .brand h1 span{color:var(--phosphor);}
+  .brand small{display:block; color:var(--text-dim); font-size:11px; letter-spacing:1px; margin-top:2px;}
 
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-main);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-        }
+  .connbox{display:flex; align-items:center; gap:12px;}
+  .status-pill{
+    font-size:11px; letter-spacing:1px; padding:6px 12px; border-radius:100px;
+    border:1px solid var(--border); color:var(--text-dim); text-transform:uppercase;
+  }
+  .status-pill.connected{ color:var(--phosphor); border-color:var(--phosphor-dim); }
+  .status-pill.connecting{ color:var(--amber); border-color:var(--amber);}
 
-        .container {
-            background-color: var(--card-bg);
-            border-radius: 1.25rem;
-            padding: 2rem;
-            width: 100%;
-            max-width: 440px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border);
-        }
+  button{
+    font-family:'IBM Plex Mono', monospace;
+    cursor:pointer; border-radius:6px; border:1px solid var(--border);
+    background: var(--bg-panel-2); color:var(--text);
+    padding:10px 16px; font-size:13px; letter-spacing:.5px;
+    transition: all .15s ease;
+  }
+  button:hover:not(:disabled){ border-color:var(--phosphor-dim); color:var(--phosphor); }
+  button:active:not(:disabled){ transform: translateY(1px); }
+  button:disabled{ opacity:.35; cursor:not-allowed; }
+  button.primary{
+    background: linear-gradient(180deg, #163b26, #0f2a1b);
+    border-color: var(--phosphor-dim); color: var(--phosphor);
+    font-weight:600;
+  }
+  button.primary:hover:not(:disabled){ box-shadow:0 0 14px rgba(92,230,124,.25); }
+  button.danger{ border-color:#5c2222; color:var(--danger); }
+  button.danger:hover:not(:disabled){ border-color:var(--danger); }
+  button.ghost{ background:transparent; }
+  button.small{ padding:6px 10px; font-size:11px; }
 
-        .header {
-            text-align: center;
-            margin-bottom: 1.5rem;
-        }
+  section.panel{
+    background: linear-gradient(180deg, var(--bg-panel), var(--bg-panel-2));
+    border:1px solid var(--border); border-radius: var(--radius);
+    padding:18px 20px; margin-bottom:16px;
+    position:relative;
+  }
+  section.panel::before{
+    content:''; position:absolute; left:0; top:14px; bottom:14px; width:3px;
+    background: var(--copper-dim); border-radius:2px;
+  }
+  .panel-title{
+    font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim);
+    margin:0 0 14px; display:flex; align-items:center; gap:8px;
+  }
+  .panel-title .n{ color:var(--copper); }
 
-        .header h1 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-            background: linear-gradient(135deg, #60a5fa, #a78bfa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+  /* pin selector */
+  .pin-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  .pin-btn{
+    width:52px; height:52px; border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;
+    border:1px solid var(--border); background:var(--bg-panel-2); color:var(--text-dim);
+  }
+  .pin-btn.active{
+    border-color:var(--phosphor); color:var(--phosphor);
+    box-shadow: 0 0 0 1px var(--phosphor-dim) inset, 0 0 14px rgba(92,230,124,.2);
+  }
+  .pin-custom{ display:flex; align-items:center; gap:8px; margin-left:6px;}
+  .pin-custom input{
+    width:64px; background:var(--bg-panel-2); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:12px 8px; font-family:'IBM Plex Mono',monospace; font-size:14px; text-align:center;
+  }
+  .pin-hint{ color:var(--text-dim); font-size:11px; margin-top:10px; line-height:1.6;}
 
-        .header p {
-            font-size: 0.875rem;
-            color: var(--text-sub);
-        }
+  /* servo main control */
+  .servo-grid{ display:grid; grid-template-columns: 220px 1fr; gap:28px; align-items:center;}
+  @media (max-width:640px){ .servo-grid{ grid-template-columns:1fr; } }
 
-        .status-badge {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-            background-color: rgba(15, 23, 42, 0.6);
-            padding: 0.6rem 1rem;
-            border-radius: 0.75rem;
-            font-size: 0.875rem;
-            margin-bottom: 1.5rem;
-            border: 1px solid var(--border);
-        }
+  .dial-wrap{ display:flex; flex-direction:column; align-items:center; gap:10px;}
+  .angle-readout{
+    font-family:'Space Grotesk',sans-serif; font-size:34px; font-weight:700; color:var(--phosphor);
+    text-shadow:0 0 18px rgba(92,230,124,.35);
+  }
+  .angle-readout small{ font-size:14px; color:var(--text-dim); font-weight:500;}
 
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background-color: var(--danger);
-            transition: background-color 0.3s ease;
-        }
+  .slider-block label{ font-size:11px; letter-spacing:1.5px; color:var(--text-dim); text-transform:uppercase;}
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:6px; border-radius:4px; margin:14px 0 10px;
+    background: linear-gradient(90deg, var(--phosphor-dim), var(--copper-dim));
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:20px; height:20px; border-radius:50%;
+    background: var(--phosphor); box-shadow:0 0 10px var(--phosphor-glow), 0 0 0 4px rgba(92,230,124,.12);
+    cursor:pointer; border:2px solid #08130d;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:20px; height:20px; border-radius:50%; background: var(--phosphor);
+    box-shadow:0 0 10px var(--phosphor-glow); cursor:pointer; border:2px solid #08130d;
+  }
+  .preset-row{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+  .actions-row{ display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;}
 
-        .status-dot.connected {
-            background-color: var(--success);
-            box-shadow: 0 0 10px var(--success);
-        }
+  /* calibration */
+  details.panel > summary{ cursor:pointer; list-style:none; }
+  details.panel > summary::-webkit-details-marker{ display:none; }
+  .calib-title{ display:flex; align-items:center; justify-content:space-between; }
+  .caret{ transition: transform .2s; color:var(--copper); }
+  details[open] .caret{ transform: rotate(90deg); }
+  .calib-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-top:16px;}
+  .field label{ font-size:10.5px; letter-spacing:1px; color:var(--text-dim); text-transform:uppercase; display:block; margin-bottom:6px;}
+  .field input[type=number]{
+    width:100%; background:var(--bg-panel-2); border:1px solid var(--border); color:var(--text);
+    border-radius:6px; padding:10px; font-family:'IBM Plex Mono',monospace; font-size:13px;
+  }
+  .field-check{ display:flex; align-items:center; gap:8px; margin-top:4px;}
 
-        .btn {
-            width: 100%;
-            padding: 0.85rem 1.25rem;
-            border: none;
-            border-radius: 0.75rem;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
+  .wiring{ display:flex; gap:18px; align-items:center; margin-top:16px; flex-wrap:wrap;}
+  .wiring svg{ flex-shrink:0; }
+  .wiring ul{ margin:0; padding-left:18px; color:var(--text-dim); font-size:12px; line-height:1.9;}
+  .wiring li span{ color:var(--phosphor); }
 
-        .btn-primary {
-            background-color: var(--primary);
-            color: white;
-        }
+  /* console */
+  .console{
+    background:#060d09; border:1px solid var(--border); border-radius:8px;
+    padding:12px 14px; height:150px; overflow-y:auto; font-size:11.5px; line-height:1.7;
+  }
+  .console .line{ white-space:pre-wrap; word-break:break-word; }
+  .console .t{ color:var(--copper-dim); }
+  .console .ok{ color:var(--phosphor); }
+  .console .err{ color:var(--danger); }
+  .console .info{ color:var(--text-dim); }
 
-        .btn-primary:hover:not(:disabled) {
-            background-color: var(--primary-hover);
-        }
+  footer{ margin-top:24px; text-align:center; color:var(--text-dim); font-size:11px; letter-spacing:.5px; }
 
-        .btn-action {
-            background-color: #334155;
-            color: white;
-        }
+  .unsupported{
+    border:1px solid #5c2222; background:rgba(255,92,92,.06); color:#ffb3b3;
+    padding:16px 18px; border-radius:8px; font-size:13px; line-height:1.7; margin-bottom:18px;
+  }
 
-        .btn-action:hover:not(:disabled) {
-            background-color: #475569;
-        }
-
-        .btn-danger {
-            background-color: var(--danger);
-            color: white;
-        }
-
-        .btn-danger:hover:not(:disabled) {
-            background-color: #dc2626;
-        }
-
-        .btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .grid-3 {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .slider-section {
-            background-color: rgba(15, 23, 42, 0.4);
-            padding: 1.25rem;
-            border-radius: 0.85rem;
-            border: 1px solid var(--border);
-            margin-bottom: 1.5rem;
-        }
-
-        .slider-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 0.75rem;
-        }
-
-        .slider-header label {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        .angle-val {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        input[type="range"] {
-            width: 100%;
-            height: 6px;
-            background: #334155;
-            border-radius: 3px;
-            outline: none;
-            accent-color: var(--primary);
-            cursor: pointer;
-        }
-
-        .log-box {
-            background-color: #090d16;
-            border-radius: 0.75rem;
-            padding: 0.75rem;
-            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            font-size: 0.75rem;
-            color: #a7f3d0;
-            height: 90px;
-            overflow-y: auto;
-            border: 1px solid #1e293b;
-        }
-
-        .divider {
-            border: none;
-            height: 1px;
-            background-color: var(--border);
-            margin: 1.5rem 0;
-        }
-    </style>
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; animation:none !important; }
+  }
+</style>
 </head>
 <body>
+<div class="wrap">
 
-    <div class="container">
-        <div class="header">
-            <h1>Control Micro:Bit v1.5</h1>
-            <p>Servomotor por Web Bluetooth API</p>
+  <header>
+    <div class="brand">
+      <div class="dot" id="statusDot"></div>
+      <div>
+        <h1>SERVO<span>::</span>CTRL</h1>
+        <small>MICRO:BIT V1.5 · IO PIN SERVICE · WEB BLUETOOTH</small>
+      </div>
+    </div>
+    <div class="connbox">
+      <span class="status-pill" id="statusPill">DESCONECTADO</span>
+      <button class="primary" id="btnConnect">CONECTAR</button>
+      <button class="danger ghost" id="btnDisconnect" disabled>DESCONECTAR</button>
+    </div>
+  </header>
+
+  <div class="unsupported" id="unsupportedBox" style="display:none;">
+    ⚠ Este navegador no soporta Web Bluetooth API. Usá <strong>Chrome</strong>, <strong>Edge</strong> u <strong>Opera</strong> de escritorio o Android,
+    y accedé por <strong>HTTPS</strong> o <strong>localhost</strong>.
+  </div>
+
+  <section class="panel">
+    <p class="panel-title"><span class="n">01</span> SELECCIÓN DE PIN</p>
+    <div class="pin-row" id="pinRow">
+      <button class="pin-btn active" data-pin="0">P0</button>
+      <button class="pin-btn" data-pin="1">P1</button>
+      <button class="pin-btn" data-pin="2">P2</button>
+      <div class="pin-custom">
+        <span style="color:var(--text-dim); font-size:11px;">OTRO:</span>
+        <input type="number" id="customPin" min="0" max="20" placeholder="—">
+      </div>
+    </div>
+    <p class="pin-hint">P0, P1 y P2 son los pines grandes accesibles con clips tipo caimán o el conector de borde. El servo se conecta con: señal → pin elegido, GND → GND. No alimentes el servo desde el 3V de la micro:bit si es de torque alto: usá una fuente externa de 5V compartiendo GND.</p>
+  </section>
+
+  <section class="panel">
+    <p class="panel-title"><span class="n">02</span> CONTROL DE ÁNGULO</p>
+    <div class="servo-grid">
+      <div class="dial-wrap">
+        <svg id="dialSvg" width="200" height="200" viewBox="0 0 200 200">
+          <circle cx="100" cy="100" r="92" fill="none" stroke="#1c3227" stroke-width="1.5"/>
+          <g id="ticks"></g>
+          <circle cx="100" cy="100" r="60" fill="#0c1813" stroke="#1c3227" stroke-width="1"/>
+          <line id="needle" x1="100" y1="100" x2="100" y2="46" stroke="#5ce67c" stroke-width="4" stroke-linecap="round" style="filter:drop-shadow(0 0 6px rgba(92,230,124,.6)); transition: transform .12s ease-out;" transform="rotate(-90,100,100)"/>
+          <circle cx="100" cy="100" r="7" fill="#5ce67c" style="filter:drop-shadow(0 0 6px rgba(92,230,124,.6));"/>
+        </svg>
+        <div class="angle-readout"><span id="angleValue">90</span><small>°</small></div>
+      </div>
+
+      <div>
+        <div class="slider-block">
+          <label>Ángulo objetivo</label>
+          <input type="range" id="angleSlider" min="0" max="180" value="90" step="1">
         </div>
-
-        <div class="status-badge">
-            <div id="statusDot" class="status-dot"></div>
-            <span id="statusText">Estado: Desconectado</span>
+        <div class="preset-row">
+          <button class="small" data-preset="0">0°</button>
+          <button class="small" data-preset="45">45°</button>
+          <button class="small" data-preset="90">90°</button>
+          <button class="small" data-preset="135">135°</button>
+          <button class="small" data-preset="180">180°</button>
         </div>
-
-        <button id="connectBtn" class="btn btn-primary">
-            📡 Conectar Micro:Bit
-        </button>
-
-        <hr class="divider">
-
-        <div class="slider-section">
-            <div class="slider-header">
-                <label for="angleSlider">Ángulo Libre (0° - 180°)</label>
-                <span id="angleDisplay" class="angle-val">90°</span>
-            </div>
-            <input type="range" id="angleSlider" min="0" max="180" value="90" disabled>
+        <div class="actions-row">
+          <button id="btnSweep">▶ BARRIDO DE PRUEBA</button>
+          <button id="btnStopSweep" class="ghost" disabled>■ DETENER</button>
         </div>
+      </div>
+    </div>
+  </section>
 
-        <div class="grid-3">
-            <button id="btn0" class="btn btn-action" disabled>0° (Cerrar)</button>
-            <button id="btn90" class="btn btn-action" disabled>90° (Medio)</button>
-            <button id="btn180" class="btn btn-action" disabled>180° (Abrir)</button>
+  <details class="panel">
+    <summary>
+      <div class="calib-title">
+        <p class="panel-title" style="margin:0;"><span class="n">03</span> CALIBRACIÓN Y CABLEADO</p>
+        <span class="caret">▸</span>
+      </div>
+    </summary>
+    <div class="calib-grid">
+      <div class="field">
+        <label>Pulso mínimo (µs · 0°)</label>
+        <input type="number" id="pulseMin" value="500" min="300" max="3000" step="10">
+      </div>
+      <div class="field">
+        <label>Pulso máximo (µs · 180°)</label>
+        <input type="number" id="pulseMax" value="2400" min="300" max="3000" step="10">
+      </div>
+      <div class="field">
+        <label>Período PWM (µs)</label>
+        <input type="number" id="pwmPeriod" value="20000" min="1000" max="60000" step="100">
+      </div>
+      <div class="field">
+        <label>&nbsp;</label>
+        <div class="field-check">
+          <input type="checkbox" id="invertServo">
+          <label style="text-transform:none; letter-spacing:0; font-size:12px;" for="invertServo">Invertir sentido</label>
         </div>
-
-        <div class="log-box" id="logBox">
-            [SISTEMA] Listo para iniciar conexión Bluetooth...
-        </div>
+      </div>
     </div>
 
-    <script>
-        // UUIDs oficiales del Servicio IO Pin de Micro:Bit
-        const IO_PIN_SERVICE_UUID = 'e95d127b-251d-470a-a062-fa1922dfa9a8';
-        const PWM_CONTROL_UUID    = 'e95dd822-251d-470a-a062-fa1922dfa9a8';
+    <div class="wiring">
+      <svg width="170" height="120" viewBox="0 0 170 120">
+        <rect x="4" y="20" width="90" height="80" rx="6" fill="#0d1c15" stroke="#1c3227"/>
+        <text x="49" y="12" fill="#7fa08c" font-size="9" text-anchor="middle" font-family="IBM Plex Mono">micro:bit</text>
+        <circle cx="26" cy="45" r="5" fill="#c9793f"/><text x="26" y="65" fill="#7fa08c" font-size="8" text-anchor="middle">GND</text>
+        <circle cx="49" cy="45" r="5" fill="#c9793f"/><text x="49" y="65" fill="#7fa08c" font-size="8" text-anchor="middle">3V</text>
+        <circle cx="72" cy="45" r="5" fill="#5ce67c"/><text x="72" y="65" fill="#5ce67c" font-size="8" text-anchor="middle">P0</text>
+        <line x1="26" y1="45" x2="26" y2="90" stroke="#c9793f" stroke-width="2"/>
+        <line x1="72" y1="45" x2="130" y2="45" stroke="#5ce67c" stroke-width="2"/>
+        <rect x="126" y="35" width="40" height="30" rx="4" fill="#0d1c15" stroke="#1c3227"/>
+        <text x="146" y="53" fill="#e9f3ec" font-size="8" text-anchor="middle">SERVO</text>
+      </svg>
+      <ul>
+        <li><span>Señal</span> → pin seleccionado (ej. P0)</li>
+        <li><span>GND</span> → GND (común obligatorio)</li>
+        <li><span>V+</span> → fuente externa 5V recomendada</li>
+        <li>Micro-servos (SG90) toleran 3V directo del micro:bit para pruebas cortas</li>
+      </ul>
+    </div>
+  </details>
 
-        let bluetoothDevice = null;
-        let pwmCharacteristic = null;
+  <section class="panel">
+    <p class="panel-title"><span class="n">04</span> CONSOLA</p>
+    <div class="console" id="console"></div>
+  </section>
 
-        // Elementos del DOM
-        const connectBtn = document.getElementById('connectBtn');
-        const statusDot = document.getElementById('statusDot');
-        const statusText = document.getElementById('statusText');
-        const angleSlider = document.getElementById('angleSlider');
-        const angleDisplay = document.getElementById('angleDisplay');
-        const btn0 = document.getElementById('btn0');
-        const btn90 = document.getElementById('btn90');
-        const btn180 = document.getElementById('btn180');
-        const logBox = document.getElementById('logBox');
+  <footer>
+    Requiere navegador con Web Bluetooth (Chrome / Edge / Opera) y contexto seguro (HTTPS o localhost).
+  </footer>
+</div>
 
-        function log(message) {
-            const time = new Date().toLocaleTimeString();
-            logBox.innerHTML += `<br>[${time}] ${message}`;
-            logBox.scrollTop = logBox.scrollHeight;
-        }
+<script>
+(() => {
+  // ---- Micro:bit BLE IO Pin Service UUIDs ----
+  const IO_PIN_SERVICE      = 'e95d127b-251d-470a-a062-fa1922dfa9a8';
+  const PIN_AD_CONFIG_CHAR  = 'e95d5899-251d-470a-a062-fa1922dfa9a8'; // 1=analog,0=digital
+  const PIN_IO_CONFIG_CHAR  = 'e95d5b9a-251d-470a-a062-fa1922dfa9a8'; // 1=digital I/O owns pin
+  const PWM_CONTROL_CHAR    = 'e95dd822-251d-470a-a062-fa1922dfa9a8'; // pin(1)+value(2 LE)+period(4 LE)
 
-        function setUIConnected(connected) {
-            if (connected) {
-                statusDot.classList.add('connected');
-                statusText.textContent = "Estado: Conectado";
-                connectBtn.textContent = "🔌 Desconectar";
-                connectBtn.classList.remove('btn-primary');
-                connectBtn.classList.add('btn-danger');
-                
-                angleSlider.disabled = false;
-                btn0.disabled = false;
-                btn90.disabled = false;
-                btn180.disabled = false;
-            } else {
-                statusDot.classList.remove('connected');
-                statusText.textContent = "Estado: Desconectado";
-                connectBtn.textContent = "📡 Conectar Micro:Bit";
-                connectBtn.classList.remove('btn-danger');
-                connectBtn.classList.add('btn-primary');
+  // ---- state ----
+  let device = null, server = null, ioPinService = null;
+  let pwmChar = null, ioConfigChar = null, adConfigChar = null;
+  let currentPin = 0;
+  let currentAngle = 90;
+  let writing = false, pendingAngle = null;
+  let sweepTimer = null;
 
-                angleSlider.disabled = true;
-                btn0.disabled = true;
-                btn90.disabled = true;
-                btn180.disabled = true;
-            }
-        }
+  // ---- DOM ----
+  const $ = id => document.getElementById(id);
+  const consoleEl = $('console');
+  const statusDot = $('statusDot');
+  const statusPill = $('statusPill');
+  const btnConnect = $('btnConnect');
+  const btnDisconnect = $('btnDisconnect');
+  const angleSlider = $('angleSlider');
+  const angleValue = $('angleValue');
+  const needle = $('needle');
+  const pulseMin = $('pulseMin');
+  const pulseMax = $('pulseMax');
+  const pwmPeriod = $('pwmPeriod');
+  const invertServo = $('invertServo');
+  const customPinInput = $('customPin');
+  const btnSweep = $('btnSweep');
+  const btnStopSweep = $('btnStopSweep');
 
-        connectBtn.addEventListener('click', async () => {
-            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
-                bluetoothDevice.gatt.disconnect();
-                return;
-            }
+  function log(msg, kind){
+    const div = document.createElement('div');
+    div.className = 'line ' + (kind||'info');
+    const time = new Date().toLocaleTimeString('es-PY',{hour12:false});
+    div.innerHTML = `<span class="t">[${time}]</span> ${msg}`;
+    consoleEl.appendChild(div);
+    consoleEl.scrollTop = consoleEl.scrollHeight;
+  }
 
-            try {
-                log("Buscando dispositivo Micro:Bit...");
-                bluetoothDevice = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'BBC micro:bit' }],
-                    optionalServices: [IO_PIN_SERVICE_UUID]
-                });
+  function drawTicks(){
+    const g = $('ticks');
+    let html = '';
+    for(let a=0; a<=180; a+=15){
+      const rad = (a-90) * Math.PI/180;
+      const x1 = 100 + 84*Math.cos(rad), y1 = 100 + 84*Math.sin(rad);
+      const x2 = 100 + 92*Math.cos(rad), y2 = 100 + 92*Math.sin(rad);
+      const major = a % 45 === 0;
+      html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${major?'#c9793f':'#2f6b45'}" stroke-width="${major?2:1}"/>`;
+    }
+    g.innerHTML = html;
+  }
+  drawTicks();
 
-                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+  function setStatus(state){
+    // state: 'off' | 'connecting' | 'on'
+    statusDot.className = 'dot' + (state==='on' ? ' live' : state==='connecting' ? ' warn' : '');
+    statusPill.className = 'status-pill' + (state==='on' ? ' connected' : state==='connecting' ? ' connecting' : '');
+    statusPill.textContent = state==='on' ? 'CONECTADO' : state==='connecting' ? 'CONECTANDO…' : 'DESCONECTADO';
+    btnConnect.disabled = (state !== 'off');
+    btnDisconnect.disabled = (state !== 'on');
+    [...document.querySelectorAll('.pin-btn')].forEach(b => b.disabled = state !== 'on');
+    customPinInput.disabled = state !== 'on';
+    angleSlider.disabled = state !== 'on';
+    btnSweep.disabled = state !== 'on';
+  }
+  setStatus('off');
 
-                log("Conectando al servidor GATT...");
-                const server = await bluetoothDevice.gatt.connect();
+  function updateDial(angle){
+    const deg = angle - 90; // needle base points "up" at 90°
+    needle.setAttribute('transform', `rotate(${deg},100,100)`);
+    angleValue.textContent = Math.round(angle);
+    angleSlider.value = angle;
+  }
+  updateDial(90);
 
-                log("Obteniendo Servicio IO Pin...");
-                const service = await server.getPrimaryService(IO_PIN_SERVICE_UUID);
+  function angleToPulse(angle){
+    let a = invertServo.checked ? (180 - angle) : angle;
+    const min = parseInt(pulseMin.value,10) || 500;
+    const max = parseInt(pulseMax.value,10) || 2400;
+    return Math.round(min + (a/180) * (max-min));
+  }
 
-                log("Obteniendo Característica Control PWM...");
-                pwmCharacteristic = await service.getCharacteristic(PWM_CONTROL_UUID);
+  // ---- BLE connect flow ----
+  async function connect(){
+    if(!navigator.bluetooth){
+      $('unsupportedBox').style.display = 'block';
+      return;
+    }
+    try{
+      setStatus('connecting');
+      log('Solicitando dispositivo Bluetooth…');
+      device = await navigator.bluetooth.requestDevice({
+        filters: [{ namePrefix: 'BBC micro:bit' }],
+        optionalServices: [IO_PIN_SERVICE]
+      });
+      device.addEventListener('gattserverdisconnected', onDisconnected);
 
-                log("¡Conexión establecida con éxito!");
-                setUIConnected(true);
+      log(`Dispositivo: <span class="ok">${device.name || 'micro:bit'}</span>`);
+      log('Conectando a servidor GATT…');
+      server = await device.gatt.connect();
 
-            } catch (error) {
-                log(`Error: ${error.message}`);
-                console.error(error);
-                setUIConnected(false);
-            }
-        });
+      log('Obteniendo IO Pin Service…');
+      ioPinService = await server.getPrimaryService(IO_PIN_SERVICE);
 
-        async function setServoAngle(pin, angle) {
-            if (!pwmCharacteristic) {
-                log("Error: Dispositivo no conectado.");
-                return;
-            }
+      pwmChar = await ioPinService.getCharacteristic(PWM_CONTROL_CHAR);
+      try{ ioConfigChar = await ioPinService.getCharacteristic(PIN_IO_CONFIG_CHAR); }catch(e){}
+      try{ adConfigChar = await ioPinService.getCharacteristic(PIN_AD_CONFIG_CHAR); }catch(e){}
 
-            // Calculo de pulso estándar (500us a 0° - 2500us a 180°, periodo 20000us)
-            const pulseWidth = Math.round(500 + (angle / 180) * 2000);
-            const period = 20000;
+      log('Servicio y características listos.', 'ok');
+      setStatus('on');
 
-            const buffer = new ArrayBuffer(7);
-            const view = new DataView(buffer);
-            view.setUint8(0, pin);              // Pin P0
-            view.setUint16(1, pulseWidth, true); // Ancho de pulso (us)
-            view.setUint32(3, period, true);     // Periodo (us)
+      await preparePin(currentPin);
+      await writeAngle(currentAngle, true);
 
-            try {
-                await pwmCharacteristic.writeValue(buffer);
-                angleDisplay.textContent = `${angle}°`;
-                angleSlider.value = angle;
-                log(`Servo P${pin} -> ${angle}° (${pulseWidth}µs)`);
-            } catch (error) {
-                log(`Error al enviar PWM: ${error.message}`);
-                console.error(error);
-            }
-        }
+    }catch(err){
+      log('Error de conexión: ' + err.message, 'err');
+      setStatus('off');
+    }
+  }
 
-        // Eventos de botones
-        btn0.addEventListener('click', () => setServoAngle(0, 0));
-        btn90.addEventListener('click', () => setServoAngle(0, 90));
-        btn180.addEventListener('click', () => setServoAngle(0, 180));
+  function onDisconnected(){
+    log('Dispositivo desconectado.', 'err');
+    setStatus('off');
+    stopSweep();
+  }
 
-        // Evento slider con debounce sencillo
-        let sliderTimeout = null;
-        angleSlider.addEventListener('input', (e) => {
-            const val = e.target.value;
-            angleDisplay.textContent = `${val}°`;
-            
-            clearTimeout(sliderTimeout);
-            sliderTimeout = setTimeout(() => {
-                setServoAngle(0, parseInt(val));
-            }, 50);
-        });
+  async function disconnect(){
+    if(device && device.gatt.connected){
+      device.gatt.disconnect();
+    }
+    setStatus('off');
+    log('Desconexión manual.');
+    stopSweep();
+  }
 
-        function onDisconnected() {
-            log("Dispositivo Bluetooth desconectado.");
-            setUIConnected(false);
-            pwmCharacteristic = null;
-            bluetoothDevice = null;
-        }
-    </script>
+  // libera el pin del control digital exclusivo para que PWM pueda manejarlo
+  async function preparePin(pin){
+    try{
+      if(ioConfigChar){
+        const val = await ioConfigChar.readValue();
+        let mask = val.getUint32(0, true);
+        mask &= ~(1 << pin); // 0 = libre para PWM/analog
+        const buf = new ArrayBuffer(4);
+        new DataView(buf).setUint32(0, mask, true);
+        await ioConfigChar.writeValue(buf);
+      }
+      if(adConfigChar){
+        const val = await adConfigChar.readValue();
+        let mask = val.getUint32(0, true);
+        mask &= ~(1 << pin); // 0 = digital (PWM usa esta vía)
+        const buf = new ArrayBuffer(4);
+        new DataView(buf).setUint32(0, mask, true);
+        await adConfigChar.writeValue(buf);
+      }
+      log(`Pin P${pin} preparado para PWM.`, 'ok');
+    }catch(e){
+      log(`Aviso: no se pudo pre-configurar P${pin} (continuando igual): ${e.message}`, 'info');
+    }
+  }
+
+  // ---- PWM write (7 bytes: pin u8, value u16 LE, period u32 LE) ----
+  async function sendPWM(pin, pulseUs, periodUs){
+    if(!pwmChar) return;
+    const buf = new ArrayBuffer(7);
+    const dv = new DataView(buf);
+    dv.setUint8(0, pin);
+    dv.setUint16(1, pulseUs, true);
+    dv.setUint32(3, periodUs, true);
+    await pwmChar.writeValue(buf);
+  }
+
+  async function writeAngle(angle, force){
+    currentAngle = angle;
+    updateDial(angle);
+    if(writing){ pendingAngle = angle; return; }
+    if(!pwmChar) return;
+    writing = true;
+    try{
+      const pulse = angleToPulse(angle);
+      const period = parseInt(pwmPeriod.value,10) || 20000;
+      await sendPWM(currentPin, pulse, period);
+      log(`P${currentPin} → ${Math.round(angle)}° (pulso ${pulse}µs)`);
+    }catch(e){
+      log('Error al escribir PWM: ' + e.message, 'err');
+    }finally{
+      writing = false;
+      if(pendingAngle !== null){
+        const next = pendingAngle;
+        pendingAngle = null;
+        writeAngle(next);
+      }
+    }
+  }
+
+  // ---- UI events ----
+  btnConnect.addEventListener('click', connect);
+  btnDisconnect.addEventListener('click', disconnect);
+
+  angleSlider.addEventListener('input', e => {
+    updateDial(parseInt(e.target.value,10));
+  });
+  angleSlider.addEventListener('change', e => {
+    writeAngle(parseInt(e.target.value,10));
+  });
+
+  document.querySelectorAll('[data-preset]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const a = parseInt(btn.dataset.preset,10);
+      writeAngle(a);
+    });
+  });
+
+  document.querySelectorAll('.pin-btn').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      document.querySelectorAll('.pin-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      currentPin = parseInt(btn.dataset.pin,10);
+      customPinInput.value = '';
+      log(`Pin activo: P${currentPin}`);
+      if(server && server.connected) await preparePin(currentPin);
+    });
+  });
+
+  customPinInput.addEventListener('change', async ()=>{
+    const v = parseInt(customPinInput.value,10);
+    if(isNaN(v) || v<0 || v>20){ log('Pin inválido (rango 0–20).', 'err'); return; }
+    document.querySelectorAll('.pin-btn').forEach(b=>b.classList.remove('active'));
+    currentPin = v;
+    log(`Pin activo: P${currentPin} (personalizado)`);
+    if(server && server.connected) await preparePin(currentPin);
+  });
+
+  btnSweep.addEventListener('click', ()=>{
+    let dir = 1, a = currentAngle;
+    btnSweep.disabled = true; btnStopSweep.disabled = false;
+    log('Iniciando barrido de prueba 0°↔180°…');
+    sweepTimer = setInterval(()=>{
+      a += dir*3;
+      if(a>=180){ a=180; dir=-1; }
+      if(a<=0){ a=0; dir=1; }
+      writeAngle(a);
+    }, 60);
+  });
+  function stopSweep(){
+    if(sweepTimer){ clearInterval(sweepTimer); sweepTimer=null; }
+    btnSweep.disabled = !(server && server.connected);
+    btnStopSweep.disabled = true;
+  }
+  btnStopSweep.addEventListener('click', ()=>{ stopSweep(); log('Barrido detenido.'); });
+
+  if(!navigator.bluetooth){
+    $('unsupportedBox').style.display = 'block';
+    log('Web Bluetooth no disponible en este navegador.', 'err');
+  } else {
+    log('Listo. Hacé clic en CONECTAR para emparejar tu micro:bit.');
+  }
+})();
+</script>
 </body>
 </html>
