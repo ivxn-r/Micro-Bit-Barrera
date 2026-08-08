@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Micro:Bit Servomotor</title>
+    <title>Control Servo Micro:Bit v1.5</title>
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background-color: #0f172a;
             color: #f8fafc;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
             margin: 0;
         }
@@ -20,33 +19,30 @@
             background-color: #1e293b;
             padding: 2rem;
             border-radius: 1rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             text-align: center;
-            max-width: 400px;
+            max-width: 380px;
             width: 90%;
         }
         button {
-            background-color: #3b82f6;
+            background-color: #2563eb;
             color: white;
             border: none;
-            padding: 0.75rem 1.5rem;
+            padding: 0.8rem 1.2rem;
             margin: 0.5rem 0;
             font-size: 1rem;
             font-weight: bold;
             border-radius: 0.5rem;
             cursor: pointer;
-            transition: background 0.2s;
             width: 100%;
         }
-        button:hover { background-color: #2563eb; }
         button:disabled { background-color: #475569; cursor: not-allowed; }
-        .danger { background-color: #ef4444; }
-        .danger:hover { background-color: #dc2626; }
+        .danger { background-color: #dc2626; }
         #status {
             margin-top: 1rem;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             color: #94a3b8;
-            word-break: break-word;
+            word-break: break-all;
         }
     </style>
 </head>
@@ -54,21 +50,19 @@
 
     <div class="card">
         <h2>Control Servo Micro:Bit</h2>
-        <button id="connectBtn">Conectar Micro:Bit</button>
-        <hr style="border-color: #334155; margin: 1rem 0;">
-        <button id="openBtn" disabled>Girar a 180° (Abrir)</button>
-        <button id="closeBtn" class="danger" disabled>Girar a 0° (Cerrar)</button>
+        <button id="connectBtn">1. Conectar Bluetooth</button>
+        <hr style="border-color: #334155; margin: 1.2rem 0;">
+        <button id="openBtn" disabled>Abrir (180°)</button>
+        <button id="closeBtn" class="danger" disabled>Cerrar (0°)</button>
         <div id="status">Estado: Desconectado</div>
     </div>
 
     <script>
-        // UUIDs oficiales del Servicio UART de Micro:Bit
-        const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-        // RX Characteristic (6e400002) es donde la Micro:Bit RECIBE nuestros datos
-        const UART_RX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
+        // UUIDs Estándar del servicio IO PIN de Micro:Bit
+        const IO_PIN_SERVICE_UUID = 'e95d127b-251d-470a-a062-fa1922dfa9a8';
+        const PWM_CONTROL_UUID    = 'e95dd822-251d-470a-a062-fa1922dfa9a8';
 
-        let bluetoothDevice = null;
-        let rxCharacteristic = null;
+        let pwmCharacteristic = null;
 
         const connectBtn = document.getElementById('connectBtn');
         const openBtn = document.getElementById('openBtn');
@@ -79,64 +73,67 @@
             try {
                 statusDiv.textContent = "Buscando Micro:Bit...";
                 
-                // Pedimos el dispositivo con el prefijo estándar 'BBC micro:bit'
-                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                const device = await navigator.bluetooth.requestDevice({
                     filters: [{ namePrefix: 'BBC micro:bit' }],
-                    optionalServices: [UART_SERVICE_UUID]
+                    optionalServices: [IO_PIN_SERVICE_UUID]
                 });
 
                 statusDiv.textContent = "Conectando al servidor GATT...";
-                const server = await bluetoothDevice.gatt.connect();
+                const server = await device.gatt.connect();
 
-                statusDiv.textContent = "Accediendo al Servicio UART...";
-                const service = await server.getPrimaryService(UART_SERVICE_UUID);
+                statusDiv.textContent = "Obteniendo Servicio IO Pin...";
+                const service = await server.getPrimaryService(IO_PIN_SERVICE_UUID);
 
-                statusDiv.textContent = "Accediendo a la característica RX...";
-                rxCharacteristic = await service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);
+                statusDiv.textContent = "Obteniendo Control PWM...";
+                pwmCharacteristic = await service.getCharacteristic(PWM_CONTROL_UUID);
 
-                statusDiv.textContent = "Estado: ¡Conectado exitosamente!";
+                statusDiv.textContent = "Estado: ¡Conectado con éxito!";
                 connectBtn.textContent = "Conectado";
                 connectBtn.disabled = true;
                 openBtn.disabled = false;
                 closeBtn.disabled = false;
 
-                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+                device.addEventListener('gattserverdisconnected', () => {
+                    statusDiv.textContent = "Estado: Desconectado";
+                    connectBtn.textContent = "1. Conectar Bluetooth";
+                    connectBtn.disabled = false;
+                    openBtn.disabled = true;
+                    closeBtn.disabled = true;
+                });
 
             } catch (error) {
                 console.error(error);
-                statusDiv.textContent = "Error de conexión: " + error.message;
+                statusDiv.textContent = "Error: " + error.message;
             }
         });
 
-        async function sendCommand(cmd) {
-            if (!rxCharacteristic) {
-                statusDiv.textContent = "Error: No hay conexión establecida.";
-                return;
-            }
+        // Envía comandos PWM directamente al hardware de la Micro:Bit
+        async function setServoAngle(pin, angle) {
+            if (!pwmCharacteristic) return;
+
+            // Mapeo de ángulos a pulso PWM en microsegundos (periodo estándar 20000us / 50Hz)
+            // 0° ≈ 500us (0x01F4), 180° ≈ 2500us (0x09C4)
+            const pulseWidth = Math.round(500 + (angle / 180) * 2000);
+            const period = 20000; 
+
+            // Estructura del buffer IO Pin PWM: [Pin(1 byte), Value(2 bytes LE), Period(4 bytes LE)]
+            const buffer = new ArrayBuffer(7);
+            const view = new DataView(buffer);
+            view.setUint8(0, pin);              // Pin P0
+            view.setUint16(1, pulseWidth, true); // Ancho de pulso (us)
+            view.setUint32(3, period, true);     // Periodo (us)
+
             try {
-                // Enviamos el comando terminado en \r\n para la Micro:Bit
-                const encoder = new TextEncoder();
-                const data = encoder.encode(cmd + '\r\n');
-                await rxCharacteristic.writeValue(data);
-                statusDiv.textContent = `Enviado: "${cmd}"`;
+                await pwmCharacteristic.writeValue(buffer);
+                statusDiv.textContent = `Servo en P${pin} movido a ${angle}° (${pulseWidth}us)`;
             } catch (error) {
                 console.error(error);
-                statusDiv.textContent = "Error al enviar: " + error.message;
+                statusDiv.textContent = "Error escribiendo en Pin: " + error.message;
             }
         }
 
-        openBtn.addEventListener('click', () => sendCommand('abrir'));
-        closeBtn.addEventListener('click', () => sendCommand('cerrar'));
-
-        function onDisconnected() {
-            statusDiv.textContent = "Estado: Dispositivo desconectado.";
-            connectBtn.textContent = "Conectar Micro:Bit";
-            connectBtn.disabled = false;
-            openBtn.disabled = true;
-            closeBtn.disabled = true;
-            rxCharacteristic = null;
-            bluetoothDevice = null;
-        }
+        openBtn.addEventListener('click', () => setServoAngle(0, 180));
+        closeBtn.addEventListener('click', () => setServoAngle(0, 0));
     </script>
 </body>
 </html>
