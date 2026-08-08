@@ -58,82 +58,71 @@
     </div>
 
     <script>
-        // UUIDs Estándar del servicio IO PIN de Micro:Bit
-        const IO_PIN_SERVICE_UUID = 'e95d127b-251d-470a-a062-fa1922dfa9a8';
-        const PWM_CONTROL_UUID    = 'e95dd822-251d-470a-a062-fa1922dfa9a8';
+       // UUIDs del Servicio IO PIN
+const IO_PIN_SERVICE_UUID = 'e95d127b-251d-470a-a062-fa1922dfa9a8';
+const PIN_DATA_UUID       = 'e95d8d00-251d-470a-a062-fa1922dfa9a8';
+const PIN_AD_CONFIG_UUID  = 'e95d589e-251d-470a-a062-fa1922dfa9a8'; // Analog/Digital Config
 
-        let pwmCharacteristic = null;
+let pinDataChar = null;
 
-        const connectBtn = document.getElementById('connectBtn');
-        const openBtn = document.getElementById('openBtn');
-        const closeBtn = document.getElementById('closeBtn');
-        const statusDiv = document.getElementById('status');
+const connectBtn = document.getElementById('connectBtn');
+const openBtn = document.getElementById('openBtn');
+const closeBtn = document.getElementById('closeBtn');
+const statusDiv = document.getElementById('status');
 
-        connectBtn.addEventListener('click', async () => {
-            try {
-                statusDiv.textContent = "Buscando Micro:Bit...";
-                
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'BBC micro:bit' }],
-                    optionalServices: [IO_PIN_SERVICE_UUID]
-                });
-
-                statusDiv.textContent = "Conectando al servidor GATT...";
-                const server = await device.gatt.connect();
-
-                statusDiv.textContent = "Obteniendo Servicio IO Pin...";
-                const service = await server.getPrimaryService(IO_PIN_SERVICE_UUID);
-
-                statusDiv.textContent = "Obteniendo Control PWM...";
-                pwmCharacteristic = await service.getCharacteristic(PWM_CONTROL_UUID);
-
-                statusDiv.textContent = "Estado: ¡Conectado con éxito!";
-                connectBtn.textContent = "Conectado";
-                connectBtn.disabled = true;
-                openBtn.disabled = false;
-                closeBtn.disabled = false;
-
-                device.addEventListener('gattserverdisconnected', () => {
-                    statusDiv.textContent = "Estado: Desconectado";
-                    connectBtn.textContent = "1. Conectar Bluetooth";
-                    connectBtn.disabled = false;
-                    openBtn.disabled = true;
-                    closeBtn.disabled = true;
-                });
-
-            } catch (error) {
-                console.error(error);
-                statusDiv.textContent = "Error: " + error.message;
-            }
+connectBtn.addEventListener('click', async () => {
+    try {
+        statusDiv.textContent = "Buscando Micro:Bit...";
+        const device = await navigator.bluetooth.requestDevice({
+            filters: [{ namePrefix: 'BBC micro:bit' }],
+            optionalServices: [IO_PIN_SERVICE_UUID]
         });
 
-        // Envía comandos PWM directamente al hardware de la Micro:Bit
-        async function setServoAngle(pin, angle) {
-            if (!pwmCharacteristic) return;
+        statusDiv.textContent = "Conectando al servidor GATT...";
+        const server = await device.gatt.connect();
 
-            // Mapeo de ángulos a pulso PWM en microsegundos (periodo estándar 20000us / 50Hz)
-            // 0° ≈ 500us (0x01F4), 180° ≈ 2500us (0x09C4)
-            const pulseWidth = Math.round(500 + (angle / 180) * 2000);
-            const period = 20000; 
+        statusDiv.textContent = "Obteniendo Servicio IO Pin...";
+        const service = await server.getPrimaryService(IO_PIN_SERVICE_UUID);
 
-            // Estructura del buffer IO Pin PWM: [Pin(1 byte), Value(2 bytes LE), Period(4 bytes LE)]
-            const buffer = new ArrayBuffer(7);
-            const view = new DataView(buffer);
-            view.setUint8(0, pin);              // Pin P0
-            view.setUint16(1, pulseWidth, true); // Ancho de pulso (us)
-            view.setUint32(3, period, true);     // Periodo (us)
+        // 1. Configurar P0 en modo Analógico/PWM (bit 0 en 1)
+        const adConfigChar = await service.getCharacteristic(PIN_AD_CONFIG_UUID);
+        // Bitmask: Pin 0 = Analog (1)
+        const adConfig = new Uint32Array([0x00000001]); 
+        await adConfigChar.writeValue(adConfig);
 
-            try {
-                await pwmCharacteristic.writeValue(buffer);
-                statusDiv.textContent = `Servo en P${pin} movido a ${angle}° (${pulseWidth}us)`;
-            } catch (error) {
-                console.error(error);
-                statusDiv.textContent = "Error escribiendo en Pin: " + error.message;
-            }
-        }
+        // 2. Obtenemos la característica para enviar el valor del pin
+        pinDataChar = await service.getCharacteristic(PIN_DATA_UUID);
 
-        openBtn.addEventListener('click', () => setServoAngle(0, 180));
-        closeBtn.addEventListener('click', () => setServoAngle(0, 0));
+        statusDiv.textContent = "Estado: ¡Conectado y configurado!";
+        connectBtn.textContent = "Conectado";
+        connectBtn.disabled = true;
+        openBtn.disabled = false;
+        closeBtn.disabled = false;
+
+    } catch (error) {
+        console.error(error);
+        statusDiv.textContent = "Error: " + error.message;
+    }
+});
+
+async function writePinValue(pin, value) {
+    if (!pinDataChar) return;
+
+    // Estructura de PinData: [Pin (1 byte), Value (1 byte)]
+    const buffer = new Uint8Array([pin, value]);
+
+    try {
+        await pinDataChar.writeValue(buffer);
+        statusDiv.textContent = `Pin P${pin} enviado valor: ${value}`;
+    } catch (error) {
+        console.error(error);
+        statusDiv.textContent = "Error al escribir en Pin: " + error.message;
+    }
+}
+
+// En analog write (0-255): 0° suele ser ~25 y 180° suele ser ~128
+openBtn.addEventListener('click', () => writePinValue(0, 128));
+closeBtn.addEventListener('click', () => writePinValue(0, 25));
     </script>
 </body>
 </html>
