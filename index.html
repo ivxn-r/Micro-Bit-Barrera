@@ -3,126 +3,376 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Control Servo Micro:Bit v1.5</title>
+    <title>Control de Servomotor - Micro:Bit v1.5</title>
     <style>
-        body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background-color: #0f172a;
-            color: #f8fafc;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+            --border: #334155;
+        }
+
+        * {
+            box-sizing: border-box;
             margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
-        .card {
-            background-color: #1e293b;
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            border-radius: 1.25rem;
             padding: 2rem;
-            border-radius: 1rem;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-            text-align: center;
-            max-width: 380px;
-            width: 90%;
-        }
-        button {
-            background-color: #2563eb;
-            color: white;
-            border: none;
-            padding: 0.8rem 1.2rem;
-            margin: 0.5rem 0;
-            font-size: 1rem;
-            font-weight: bold;
-            border-radius: 0.5rem;
-            cursor: pointer;
             width: 100%;
+            max-width: 440px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border);
         }
-        button:disabled { background-color: #475569; cursor: not-allowed; }
-        .danger { background-color: #dc2626; }
-        #status {
-            margin-top: 1rem;
-            font-size: 0.85rem;
-            color: #94a3b8;
-            word-break: break-all;
+
+        .header {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            background: linear-gradient(135deg, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            font-size: 0.875rem;
+            color: var(--text-sub);
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            background-color: rgba(15, 23, 42, 0.6);
+            padding: 0.6rem 1rem;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: var(--danger);
+            transition: background-color 0.3s ease;
+        }
+
+        .status-dot.connected {
+            background-color: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.85rem 1.25rem;
+            border: none;
+            border-radius: 0.75rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-action {
+            background-color: #334155;
+            color: white;
+        }
+
+        .btn-action:hover:not(:disabled) {
+            background-color: #475569;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background-color: #dc2626;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .slider-section {
+            background-color: rgba(15, 23, 42, 0.4);
+            padding: 1.25rem;
+            border-radius: 0.85rem;
+            border: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+
+        .slider-header label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .angle-val {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: #334155;
+            border-radius: 3px;
+            outline: none;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .log-box {
+            background-color: #090d16;
+            border-radius: 0.75rem;
+            padding: 0.75rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.75rem;
+            color: #a7f3d0;
+            height: 90px;
+            overflow-y: auto;
+            border: 1px solid #1e293b;
+        }
+
+        .divider {
+            border: none;
+            height: 1px;
+            background-color: var(--border);
+            margin: 1.5rem 0;
         }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h2>Control Servo Micro:Bit</h2>
-        <button id="connectBtn">1. Conectar Bluetooth</button>
-        <hr style="border-color: #334155; margin: 1.2rem 0;">
-        <button id="openBtn" disabled>Abrir (180°)</button>
-        <button id="closeBtn" class="danger" disabled>Cerrar (0°)</button>
-        <div id="status">Estado: Desconectado</div>
+    <div class="container">
+        <div class="header">
+            <h1>Control Micro:Bit v1.5</h1>
+            <p>Servomotor por Web Bluetooth API</p>
+        </div>
+
+        <div class="status-badge">
+            <div id="statusDot" class="status-dot"></div>
+            <span id="statusText">Estado: Desconectado</span>
+        </div>
+
+        <button id="connectBtn" class="btn btn-primary">
+            📡 Conectar Micro:Bit
+        </button>
+
+        <hr class="divider">
+
+        <div class="slider-section">
+            <div class="slider-header">
+                <label for="angleSlider">Ángulo Libre (0° - 180°)</label>
+                <span id="angleDisplay" class="angle-val">90°</span>
+            </div>
+            <input type="range" id="angleSlider" min="0" max="180" value="90" disabled>
+        </div>
+
+        <div class="grid-3">
+            <button id="btn0" class="btn btn-action" disabled>0° (Cerrar)</button>
+            <button id="btn90" class="btn btn-action" disabled>90° (Medio)</button>
+            <button id="btn180" class="btn btn-action" disabled>180° (Abrir)</button>
+        </div>
+
+        <div class="log-box" id="logBox">
+            [SISTEMA] Listo para iniciar conexión Bluetooth...
+        </div>
     </div>
 
     <script>
-       // UUIDs del Servicio IO PIN
-const IO_PIN_SERVICE_UUID = 'e95d127b-251d-470a-a062-fa1922dfa9a8';
-const PIN_DATA_UUID       = 'e95d8d00-251d-470a-a062-fa1922dfa9a8';
-const PIN_AD_CONFIG_UUID  = 'e95d589e-251d-470a-a062-fa1922dfa9a8'; // Analog/Digital Config
+        // UUIDs oficiales del Servicio IO Pin de Micro:Bit
+        const IO_PIN_SERVICE_UUID = 'e95d127b-251d-470a-a062-fa1922dfa9a8';
+        const PWM_CONTROL_UUID    = 'e95dd822-251d-470a-a062-fa1922dfa9a8';
 
-let pinDataChar = null;
+        let bluetoothDevice = null;
+        let pwmCharacteristic = null;
 
-const connectBtn = document.getElementById('connectBtn');
-const openBtn = document.getElementById('openBtn');
-const closeBtn = document.getElementById('closeBtn');
-const statusDiv = document.getElementById('status');
+        // Elementos del DOM
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const angleSlider = document.getElementById('angleSlider');
+        const angleDisplay = document.getElementById('angleDisplay');
+        const btn0 = document.getElementById('btn0');
+        const btn90 = document.getElementById('btn90');
+        const btn180 = document.getElementById('btn180');
+        const logBox = document.getElementById('logBox');
 
-connectBtn.addEventListener('click', async () => {
-    try {
-        statusDiv.textContent = "Buscando Micro:Bit...";
-        const device = await navigator.bluetooth.requestDevice({
-            filters: [{ namePrefix: 'BBC micro:bit' }],
-            optionalServices: [IO_PIN_SERVICE_UUID]
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            logBox.innerHTML += `<br>[${time}] ${message}`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        function setUIConnected(connected) {
+            if (connected) {
+                statusDot.classList.add('connected');
+                statusText.textContent = "Estado: Conectado";
+                connectBtn.textContent = "🔌 Desconectar";
+                connectBtn.classList.remove('btn-primary');
+                connectBtn.classList.add('btn-danger');
+                
+                angleSlider.disabled = false;
+                btn0.disabled = false;
+                btn90.disabled = false;
+                btn180.disabled = false;
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = "Estado: Desconectado";
+                connectBtn.textContent = "📡 Conectar Micro:Bit";
+                connectBtn.classList.remove('btn-danger');
+                connectBtn.classList.add('btn-primary');
+
+                angleSlider.disabled = true;
+                btn0.disabled = true;
+                btn90.disabled = true;
+                btn180.disabled = true;
+            }
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+                bluetoothDevice.gatt.disconnect();
+                return;
+            }
+
+            try {
+                log("Buscando dispositivo Micro:Bit...");
+                bluetoothDevice = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'BBC micro:bit' }],
+                    optionalServices: [IO_PIN_SERVICE_UUID]
+                });
+
+                bluetoothDevice.addEventListener('gattserverdisconnected', onDisconnected);
+
+                log("Conectando al servidor GATT...");
+                const server = await bluetoothDevice.gatt.connect();
+
+                log("Obteniendo Servicio IO Pin...");
+                const service = await server.getPrimaryService(IO_PIN_SERVICE_UUID);
+
+                log("Obteniendo Característica Control PWM...");
+                pwmCharacteristic = await service.getCharacteristic(PWM_CONTROL_UUID);
+
+                log("¡Conexión establecida con éxito!");
+                setUIConnected(true);
+
+            } catch (error) {
+                log(`Error: ${error.message}`);
+                console.error(error);
+                setUIConnected(false);
+            }
         });
 
-        statusDiv.textContent = "Conectando al servidor GATT...";
-        const server = await device.gatt.connect();
+        async function setServoAngle(pin, angle) {
+            if (!pwmCharacteristic) {
+                log("Error: Dispositivo no conectado.");
+                return;
+            }
 
-        statusDiv.textContent = "Obteniendo Servicio IO Pin...";
-        const service = await server.getPrimaryService(IO_PIN_SERVICE_UUID);
+            // Calculo de pulso estándar (500us a 0° - 2500us a 180°, periodo 20000us)
+            const pulseWidth = Math.round(500 + (angle / 180) * 2000);
+            const period = 20000;
 
-        // 1. Configurar P0 en modo Analógico/PWM (bit 0 en 1)
-        const adConfigChar = await service.getCharacteristic(PIN_AD_CONFIG_UUID);
-        // Bitmask: Pin 0 = Analog (1)
-        const adConfig = new Uint32Array([0x00000001]); 
-        await adConfigChar.writeValue(adConfig);
+            const buffer = new ArrayBuffer(7);
+            const view = new DataView(buffer);
+            view.setUint8(0, pin);              // Pin P0
+            view.setUint16(1, pulseWidth, true); // Ancho de pulso (us)
+            view.setUint32(3, period, true);     // Periodo (us)
 
-        // 2. Obtenemos la característica para enviar el valor del pin
-        pinDataChar = await service.getCharacteristic(PIN_DATA_UUID);
+            try {
+                await pwmCharacteristic.writeValue(buffer);
+                angleDisplay.textContent = `${angle}°`;
+                angleSlider.value = angle;
+                log(`Servo P${pin} -> ${angle}° (${pulseWidth}µs)`);
+            } catch (error) {
+                log(`Error al enviar PWM: ${error.message}`);
+                console.error(error);
+            }
+        }
 
-        statusDiv.textContent = "Estado: ¡Conectado y configurado!";
-        connectBtn.textContent = "Conectado";
-        connectBtn.disabled = true;
-        openBtn.disabled = false;
-        closeBtn.disabled = false;
+        // Eventos de botones
+        btn0.addEventListener('click', () => setServoAngle(0, 0));
+        btn90.addEventListener('click', () => setServoAngle(0, 90));
+        btn180.addEventListener('click', () => setServoAngle(0, 180));
 
-    } catch (error) {
-        console.error(error);
-        statusDiv.textContent = "Error: " + error.message;
-    }
-});
+        // Evento slider con debounce sencillo
+        let sliderTimeout = null;
+        angleSlider.addEventListener('input', (e) => {
+            const val = e.target.value;
+            angleDisplay.textContent = `${val}°`;
+            
+            clearTimeout(sliderTimeout);
+            sliderTimeout = setTimeout(() => {
+                setServoAngle(0, parseInt(val));
+            }, 50);
+        });
 
-async function writePinValue(pin, value) {
-    if (!pinDataChar) return;
-
-    // Estructura de PinData: [Pin (1 byte), Value (1 byte)]
-    const buffer = new Uint8Array([pin, value]);
-
-    try {
-        await pinDataChar.writeValue(buffer);
-        statusDiv.textContent = `Pin P${pin} enviado valor: ${value}`;
-    } catch (error) {
-        console.error(error);
-        statusDiv.textContent = "Error al escribir en Pin: " + error.message;
-    }
-}
-
-// En analog write (0-255): 0° suele ser ~25 y 180° suele ser ~128
-openBtn.addEventListener('click', () => writePinValue(0, 128));
-closeBtn.addEventListener('click', () => writePinValue(0, 25));
+        function onDisconnected() {
+            log("Dispositivo Bluetooth desconectado.");
+            setUIConnected(false);
+            pwmCharacteristic = null;
+            bluetoothDevice = null;
+        }
     </script>
 </body>
 </html>
