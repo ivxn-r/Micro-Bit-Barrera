@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Control de Servo — Micro:Bit</title>
+<title>Barrera — Control micro:bit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -14,6 +14,7 @@
     --text-dim:#8a8a84;
     --accent:#1f6b54;
     --accent-soft:#eaf2ee;
+    --amber:#b8862f;
     --danger:#a8443c;
   }
   *{box-sizing:border-box;}
@@ -23,9 +24,9 @@
     -webkit-font-smoothing:antialiased;
   }
   .mono{ font-family:'IBM Plex Mono', monospace; }
-  .wrap{ max-width:520px; margin:0 auto; padding:56px 24px 80px; }
+  .wrap{ max-width:480px; margin:0 auto; padding:56px 24px 80px; }
 
-  header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:44px; flex-wrap:wrap; gap:14px;}
+  header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:40px; flex-wrap:wrap; gap:14px;}
   h1{ font-size:16px; font-weight:600; letter-spacing:.2px; margin:0;}
   h1 span{ color:var(--text-dim); font-weight:400; }
 
@@ -33,8 +34,8 @@
   .status .dot{ width:6px; height:6px; border-radius:50%; background:var(--text-dim); }
   .status.on .dot{ background:var(--accent); }
   .status.on{ color:var(--accent); }
-  .status.warn .dot{ background:#b8862f; }
-  .status.warn{ color:#b8862f; }
+  .status.warn .dot{ background:var(--amber); }
+  .status.warn{ color:var(--amber); }
 
   button{
     font-family:'Inter',sans-serif; font-size:13px; font-weight:500;
@@ -53,8 +54,24 @@
   section:last-of-type{ border-bottom:none; }
   .label{ font-size:11px; letter-spacing:.6px; text-transform:uppercase; color:var(--text-dim); margin-bottom:14px; }
 
-  /* pin */
-  .pin-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  /* barrier visual */
+  .barrier-stage{ display:flex; flex-direction:column; align-items:center; gap:18px; padding:8px 0 6px; }
+  .barrier-state{ font-size:15px; font-weight:500; }
+  .barrier-state.moving{ color:var(--amber); }
+  .barrier-state.open{ color:var(--accent); }
+  #bar{ transform-origin:34px 30px; transition: transform .5s cubic-bezier(.4,0,.2,1); transform:rotate(0deg); }
+
+  .action-row{ display:flex; gap:10px; width:100%; }
+  .action-row button{ flex:1; padding:16px; font-size:14px; font-weight:600; border-radius:8px; }
+
+  /* config */
+  details summary{ cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; }
+  details summary::-webkit-details-marker{ display:none; }
+  details summary .label{ margin-bottom:0; }
+  details summary .caret{ color:var(--text-dim); font-size:12px; transition:transform .15s; }
+  details[open] summary .caret{ transform:rotate(90deg); }
+
+  .pin-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:16px; }
   .pin-btn{ width:40px; height:40px; padding:0; font-size:13px; }
   .pin-btn.active{ border-color:var(--accent); color:var(--accent); background:var(--accent-soft); }
   .pin-row input[type=number]{
@@ -63,43 +80,14 @@
   }
   .hint{ font-size:12px; color:var(--text-dim); margin-top:12px; line-height:1.7; }
 
-  /* angle */
-  .angle-top{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; }
-  .angle-value{ font-size:30px; font-weight:500; }
-  .angle-value small{ font-size:14px; color:var(--text-dim); }
-
-  .gauge{ display:flex; justify-content:center; margin:8px 0 18px; }
-
-  input[type=range]{
-    -webkit-appearance:none; width:100%; height:2px; background:var(--line); outline:none; margin:18px 0 6px;
-  }
-  input[type=range]::-webkit-slider-thumb{
-    -webkit-appearance:none; width:16px; height:16px; border-radius:50%;
-    background:var(--accent); cursor:pointer; border:none;
-  }
-  input[type=range]::-moz-range-thumb{
-    width:16px; height:16px; border-radius:50%; background:var(--accent); border:none; cursor:pointer;
-  }
-  .range-labels{ display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-bottom:18px;}
-
-  .preset-row{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;}
-  .preset-row button{ padding:7px 12px; font-size:12px; }
-  .actions-row{ display:flex; gap:8px; }
-
-  /* calibration */
-  details summary{ cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between; }
-  details summary::-webkit-details-marker{ display:none; }
-  details summary .label{ margin-bottom:0; }
-  details summary .caret{ color:var(--text-dim); font-size:12px; transition:transform .15s; }
-  details[open] summary .caret{ transform:rotate(90deg); }
-  .calib-note{ font-size:12px; color:var(--text-dim); margin:14px 0 16px; }
-  .calib-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px 16px; }
+  .calib-grid{ display:grid; grid-template-columns:1fr auto; gap:10px 16px; margin-top:18px; align-items:end; }
   .field label{ display:block; font-size:11px; color:var(--text-dim); margin-bottom:6px; }
   .field input[type=number]{
     width:100%; border:1px solid var(--line); border-radius:6px; padding:9px 10px;
     font-family:'IBM Plex Mono',monospace; font-size:13px; background:transparent; color:var(--text);
   }
-  .field-check{ grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-top:2px;}
+  .field-check{ grid-column:1/-1; display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text); margin-top:6px;}
+  .divider-mini{ grid-column:1/-1; height:1px; background:var(--line); margin:6px 0 2px; }
 
   /* console */
   .console-head{ display:flex; align-items:center; justify-content:space-between; }
@@ -125,7 +113,7 @@
 <div class="wrap">
 
   <header>
-    <h1>Control de Servo <span>· micro:bit</span></h1>
+    <h1>Barrera <span>· micro:bit</span></h1>
     <div class="status" id="status">
       <span class="dot"></span><span id="statusText">Desconectado</span>
     </div>
@@ -136,83 +124,85 @@
   </div>
 
   <section>
-    <div class="actions-row">
-      <button class="primary" id="btnConnect">Conectar micro:bit</button>
+    <div class="action-row">
+      <button class="primary" id="btnConnect">Conectar</button>
       <button id="btnDisconnect" disabled>Desconectar</button>
     </div>
   </section>
 
   <section>
-    <div class="label">Pin</div>
-    <div class="pin-row" id="pinRow">
-      <button class="pin-btn active" data-pin="0" disabled>P0</button>
-      <button class="pin-btn" data-pin="1" disabled>P1</button>
-      <button class="pin-btn" data-pin="2" disabled>P2</button>
-      <input type="number" id="customPin" min="0" max="20" placeholder="otro" disabled>
-    </div>
-    <div class="hint">Señal → pin elegido · GND → GND (común obligatorio). El SG90 tolera el 3V de la micro:bit para pruebas cortas.</div>
-  </section>
-
-  <section>
-    <div class="angle-top">
-      <div class="label" style="margin:0;">Ángulo</div>
-      <div class="angle-value mono"><span id="angleValue">90</span><small>°</small></div>
-    </div>
-
-    <div class="gauge">
-      <svg width="200" height="110" viewBox="0 0 200 110">
-        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--line)" stroke-width="2"/>
-        <line x1="100" y1="100" x2="100" y2="38" id="needle" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .12s ease-out;" transform="rotate(0,100,100)"/>
-        <circle cx="100" cy="100" r="3.5" fill="var(--accent)"/>
-        <text x="20" y="108" font-size="10" fill="var(--text-dim)" font-family="IBM Plex Mono" text-anchor="middle">0°</text>
-        <text x="100" y="16" font-size="10" fill="var(--text-dim)" font-family="IBM Plex Mono" text-anchor="middle">90°</text>
-        <text x="180" y="108" font-size="10" fill="var(--text-dim)" font-family="IBM Plex Mono" text-anchor="middle">180°</text>
+    <div class="barrier-stage">
+      <svg width="220" height="90" viewBox="0 0 220 90">
+        <rect x="26" y="30" width="8" height="52" fill="var(--line)"/>
+        <g id="bar">
+          <rect x="34" y="26" width="150" height="8" rx="3" fill="var(--accent)"/>
+          <rect x="34" y="26" width="18" height="8" rx="3" fill="var(--text-dim)"/>
+        </g>
+        <circle cx="34" cy="30" r="4" fill="var(--text)"/>
       </svg>
+      <div class="barrier-state" id="barrierState">Sin datos</div>
     </div>
 
-    <input type="range" id="angleSlider" min="0" max="180" value="90" step="1" disabled>
-    <div class="range-labels"><span>0°</span><span>180°</span></div>
-
-    <div class="preset-row">
-      <button data-preset="0" disabled>0°</button>
-      <button data-preset="45" disabled>45°</button>
-      <button data-preset="90" disabled>90°</button>
-      <button data-preset="135" disabled>135°</button>
-      <button data-preset="180" disabled>180°</button>
-    </div>
-    <div class="actions-row">
-      <button id="btnSweep" disabled>Barrido de prueba</button>
-      <button id="btnStopSweep" disabled>Detener</button>
+    <div class="action-row">
+      <button class="primary" id="btnOpen" disabled>Abrir barrera</button>
+      <button id="btnClose" disabled>Cerrar barrera</button>
     </div>
   </section>
 
   <details>
     <summary>
-      <div class="label">Calibración</div>
+      <div class="label">Configuración</div>
       <span class="caret">▸</span>
     </summary>
-    <div class="calib-note">Valores por defecto ajustados para un micro servo SG90 (9g).</div>
+
+    <div class="pin-row" id="pinRow">
+      <span style="font-size:11px; color:var(--text-dim); width:100%; margin-bottom:-8px;">Pin del servo</span>
+    </div>
+    <div class="pin-row">
+      <button class="pin-btn active" data-pin="0" disabled>P0</button>
+      <button class="pin-btn" data-pin="1" disabled>P1</button>
+      <button class="pin-btn" data-pin="2" disabled>P2</button>
+      <input type="number" id="customPin" min="0" max="20" placeholder="otro" disabled>
+    </div>
+    <div class="hint">Señal → pin elegido · GND → GND (común obligatorio).</div>
+
     <div class="calib-grid">
       <div class="field">
-        <label>Pulso mínimo — 0° (µs)</label>
+        <label>Ángulo cerrada (°)</label>
+        <input type="number" id="closedAngle" value="0" min="0" max="180" step="1">
+      </div>
+      <button class="text" id="btnTestClosed" disabled>probar</button>
+
+      <div class="field">
+        <label>Ángulo abierta (°)</label>
+        <input type="number" id="openAngle" value="90" min="0" max="180" step="1">
+      </div>
+      <button class="text" id="btnTestOpen" disabled>probar</button>
+
+      <div class="divider-mini"></div>
+
+      <div class="field">
+        <label>Pulso mínimo (µs)</label>
         <input type="number" id="pulseMin" value="500" min="300" max="3000" step="10">
       </div>
+      <div></div>
       <div class="field">
-        <label>Pulso máximo — 180° (µs)</label>
+        <label>Pulso máximo (µs)</label>
         <input type="number" id="pulseMax" value="2400" min="300" max="3000" step="10">
       </div>
+      <div></div>
       <div class="field">
         <label>Período PWM (µs)</label>
         <input type="number" id="pwmPeriod" value="20000" min="1000" max="60000" step="100">
       </div>
-      <div class="field">
-        <label>&nbsp;</label>
-      </div>
+      <div></div>
+
       <div class="field-check">
         <input type="checkbox" id="invertServo">
         <label for="invertServo">Invertir sentido</label>
       </div>
     </div>
+    <div class="hint">Valores de pulso por defecto ajustados para un micro servo SG90. Usá "probar" para ajustar los ángulos de abierta/cerrada según cómo quedó montado el brazo en tu maqueta.</div>
   </details>
 
   <section>
@@ -237,15 +227,19 @@
 
   let device=null, server=null, ioPinService=null;
   let pwmChar=null, ioConfigChar=null, adConfigChar=null;
-  let currentPin=0, currentAngle=90;
-  let writing=false, pendingAngle=null, sweepTimer=null;
+  let currentPin=0;
+  let writing=false, pendingAngle=null;
+  let barrierIsOpen=null; // null=unknown, true=open, false=closed
 
   const $ = id => document.getElementById(id);
   const consoleEl=$('console'), statusEl=$('status'), statusText=$('statusText');
   const btnConnect=$('btnConnect'), btnDisconnect=$('btnDisconnect');
-  const angleSlider=$('angleSlider'), angleValue=$('angleValue'), needle=$('needle');
+  const btnOpen=$('btnOpen'), btnClose=$('btnClose');
+  const btnTestOpen=$('btnTestOpen'), btnTestClosed=$('btnTestClosed');
+  const closedAngle=$('closedAngle'), openAngle=$('openAngle');
   const pulseMin=$('pulseMin'), pulseMax=$('pulseMax'), pwmPeriod=$('pwmPeriod'), invertServo=$('invertServo');
-  const customPinInput=$('customPin'), btnSweep=$('btnSweep'), btnStopSweep=$('btnStopSweep');
+  const customPinInput=$('customPin');
+  const barState=$('barrierState'), bar=$('bar');
   const btnToggleConsole=$('btnToggleConsole');
 
   function log(msg, kind){
@@ -269,20 +263,13 @@
     btnDisconnect.disabled = state!=='on';
     [...document.querySelectorAll('.pin-btn')].forEach(b=>b.disabled = state!=='on');
     customPinInput.disabled = state!=='on';
-    angleSlider.disabled = state!=='on';
-    btnSweep.disabled = state!=='on';
-    [...document.querySelectorAll('[data-preset]')].forEach(b=>b.disabled = state!=='on');
+    btnOpen.disabled = state!=='on';
+    btnClose.disabled = state!=='on';
+    btnTestOpen.disabled = state!=='on';
+    btnTestClosed.disabled = state!=='on';
+    if(state!=='on'){ barState.textContent='Sin datos'; barState.className='barrier-state'; }
   }
   setStatus('off');
-
-  function updateDial(angle){
-    // 0° -> needle pointing left, 90° -> up, 180° -> right
-    const rot = angle - 90;
-    needle.setAttribute('transform', `rotate(${rot},100,100)`);
-    angleValue.textContent = Math.round(angle);
-    angleSlider.value = angle;
-  }
-  updateDial(90);
 
   function angleToPulse(angle){
     let a = invertServo.checked ? (180-angle) : angle;
@@ -310,18 +297,18 @@
       log('Conectado.', 'ok');
       setStatus('on');
       await preparePin(currentPin);
-      await writeAngle(currentAngle);
+      await goToState(false); // arranca en posición cerrada por defecto
     }catch(err){
       log('Error: '+err.message, 'err');
       setStatus('off');
     }
   }
 
-  function onDisconnected(){ log('Desconectado.', 'err'); setStatus('off'); stopSweep(); }
+  function onDisconnected(){ log('Desconectado.', 'err'); setStatus('off'); }
 
   async function disconnect(){
     if(device && device.gatt.connected) device.gatt.disconnect();
-    setStatus('off'); log('Desconexión manual.'); stopSweep();
+    setStatus('off'); log('Desconexión manual.');
   }
 
   async function preparePin(pin){
@@ -350,7 +337,6 @@
   }
 
   async function writeAngle(angle){
-    currentAngle=angle; updateDial(angle);
     if(writing){ pendingAngle=angle; return; }
     if(!pwmChar) return;
     writing=true;
@@ -366,14 +352,35 @@
     }
   }
 
+  function setBarrierVisual(open, transient){
+    if(transient){
+      barState.textContent = open ? 'Abriendo…' : 'Cerrando…';
+      barState.className = 'barrier-state moving';
+    } else {
+      barState.textContent = open ? 'Abierta' : 'Cerrada';
+      barState.className = 'barrier-state' + (open ? ' open' : '');
+    }
+    bar.style.transform = `rotate(${open ? -78 : 0}deg)`;
+  }
+
+  async function goToState(open){
+    barrierIsOpen = open;
+    setBarrierVisual(open, true);
+    btnOpen.disabled = true; btnClose.disabled = true;
+    const angle = open ? parseInt(openAngle.value,10) : parseInt(closedAngle.value,10);
+    await writeAngle(angle);
+    setTimeout(()=>{
+      setBarrierVisual(open, false);
+      btnOpen.disabled = false; btnClose.disabled = false;
+    }, 550);
+  }
+
   btnConnect.addEventListener('click', connect);
   btnDisconnect.addEventListener('click', disconnect);
-  angleSlider.addEventListener('input', e=> updateDial(parseInt(e.target.value,10)));
-  angleSlider.addEventListener('change', e=> writeAngle(parseInt(e.target.value,10)));
-
-  document.querySelectorAll('[data-preset]').forEach(btn=>{
-    btn.addEventListener('click', ()=> writeAngle(parseInt(btn.dataset.preset,10)));
-  });
+  btnOpen.addEventListener('click', ()=> goToState(true));
+  btnClose.addEventListener('click', ()=> goToState(false));
+  btnTestOpen.addEventListener('click', ()=> writeAngle(parseInt(openAngle.value,10)));
+  btnTestClosed.addEventListener('click', ()=> writeAngle(parseInt(closedAngle.value,10)));
 
   document.querySelectorAll('.pin-btn').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
@@ -394,24 +401,6 @@
     log(`Pin activo: P${currentPin}`);
     if(server && server.connected) await preparePin(currentPin);
   });
-
-  btnSweep.addEventListener('click', ()=>{
-    let dir=1, a=currentAngle;
-    btnSweep.disabled=true; btnStopSweep.disabled=false;
-    log('Barrido iniciado.');
-    sweepTimer=setInterval(()=>{
-      a+=dir*3;
-      if(a>=180){a=180;dir=-1;}
-      if(a<=0){a=0;dir=1;}
-      writeAngle(a);
-    },60);
-  });
-  function stopSweep(){
-    if(sweepTimer){clearInterval(sweepTimer);sweepTimer=null;}
-    btnSweep.disabled = !(server && server.connected);
-    btnStopSweep.disabled=true;
-  }
-  btnStopSweep.addEventListener('click', ()=>{ stopSweep(); log('Barrido detenido.'); });
 
   if(!navigator.bluetooth){ $('unsupportedBox').style.display='block'; log('Web Bluetooth no disponible.', 'err'); }
   else{ log('Listo para conectar.'); }
