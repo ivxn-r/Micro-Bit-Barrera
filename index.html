@@ -23,20 +23,20 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
             text-align: center;
             max-width: 400px;
-            width: 100%;
+            width: 90%;
         }
         button {
             background-color: #3b82f6;
             color: white;
             border: none;
             padding: 0.75rem 1.5rem;
-            margin: 0.5rem;
+            margin: 0.5rem 0;
             font-size: 1rem;
             font-weight: bold;
             border-radius: 0.5rem;
             cursor: pointer;
             transition: background 0.2s;
-            width: 80%;
+            width: 100%;
         }
         button:hover { background-color: #2563eb; }
         button:disabled { background-color: #475569; cursor: not-allowed; }
@@ -46,27 +46,29 @@
             margin-top: 1rem;
             font-size: 0.9rem;
             color: #94a3b8;
+            word-break: break-word;
         }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <h2>Control Servomotor Micro:Bit</h2>
+        <h2>Control Servo Micro:Bit</h2>
         <button id="connectBtn">Conectar Micro:Bit</button>
-        <br>
+        <hr style="border-color: #334155; margin: 1rem 0;">
         <button id="openBtn" disabled>Girar a 180° (Abrir)</button>
         <button id="closeBtn" class="danger" disabled>Girar a 0° (Cerrar)</button>
-        <div id="status">Desconectado</div>
+        <div id="status">Estado: Desconectado</div>
     </div>
 
     <script>
-        // UUIDs estándar del servicio UART de Micro:Bit
+        // UUIDs oficiales del Servicio UART de Micro:Bit
         const UART_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-        const UART_TX_CHARACTERISTIC_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // Para enviar datos a la microbit
+        // RX Characteristic (6e400002) es donde la Micro:Bit RECIBE nuestros datos
+        const UART_RX_CHARACTERISTIC_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
 
         let bluetoothDevice = null;
-        let uartCharacteristic = null;
+        let rxCharacteristic = null;
 
         const connectBtn = document.getElementById('connectBtn');
         const openBtn = document.getElementById('openBtn');
@@ -77,7 +79,7 @@
             try {
                 statusDiv.textContent = "Buscando Micro:Bit...";
                 
-                // Solicitar dispositivo Bluetooth filtrando por nombre que empiece con BBC micro:bit
+                // Pedimos el dispositivo con el prefijo estándar 'BBC micro:bit'
                 bluetoothDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ namePrefix: 'BBC micro:bit' }],
                     optionalServices: [UART_SERVICE_UUID]
@@ -86,13 +88,13 @@
                 statusDiv.textContent = "Conectando al servidor GATT...";
                 const server = await bluetoothDevice.gatt.connect();
 
-                statusDiv.textContent = "Buscando servicio UART...";
+                statusDiv.textContent = "Accediendo al Servicio UART...";
                 const service = await server.getPrimaryService(UART_SERVICE_UUID);
 
-                statusDiv.textContent = "Obteniendo característica...";
-                uartCharacteristic = await service.getCharacteristic(UART_TX_CHARACTERISTIC_UUID);
+                statusDiv.textContent = "Accediendo a la característica RX...";
+                rxCharacteristic = await service.getCharacteristic(UART_RX_CHARACTERISTIC_UUID);
 
-                statusDiv.textContent = "¡Conectado exitosamente!";
+                statusDiv.textContent = "Estado: ¡Conectado exitosamente!";
                 connectBtn.textContent = "Conectado";
                 connectBtn.disabled = true;
                 openBtn.disabled = false;
@@ -102,21 +104,24 @@
 
             } catch (error) {
                 console.error(error);
-                statusDiv.textContent = "Error: " + error.message;
+                statusDiv.textContent = "Error de conexión: " + error.message;
             }
         });
 
         async function sendCommand(cmd) {
-            if (!uartCharacteristic) return;
+            if (!rxCharacteristic) {
+                statusDiv.textContent = "Error: No hay conexión establecida.";
+                return;
+            }
             try {
-                // Micro:Bit UART espera el comando seguido de un salto de línea (\n)
+                // Enviamos el comando terminado en \r\n para la Micro:Bit
                 const encoder = new TextEncoder();
-                const data = encoder.encode(cmd + '\n');
-                await uartCharacteristic.writeValue(data);
-                statusDiv.textContent = `Comando enviado: ${cmd}`;
+                const data = encoder.encode(cmd + '\r\n');
+                await rxCharacteristic.writeValue(data);
+                statusDiv.textContent = `Enviado: "${cmd}"`;
             } catch (error) {
                 console.error(error);
-                statusDiv.textContent = "Error al enviar comando";
+                statusDiv.textContent = "Error al enviar: " + error.message;
             }
         }
 
@@ -124,12 +129,12 @@
         closeBtn.addEventListener('click', () => sendCommand('cerrar'));
 
         function onDisconnected() {
-            statusDiv.textContent = "Dispositivo desconectado.";
+            statusDiv.textContent = "Estado: Dispositivo desconectado.";
             connectBtn.textContent = "Conectar Micro:Bit";
             connectBtn.disabled = false;
             openBtn.disabled = true;
             closeBtn.disabled = true;
-            uartCharacteristic = null;
+            rxCharacteristic = null;
             bluetoothDevice = null;
         }
     </script>
